@@ -1796,7 +1796,7 @@
     if (slider) {
       const updateThumbColor = () => {
         const idx = parseInt(slider.value);
-        const colors = ["#c85745", "#c85745", "#191816", "#2f7357", "#2f7357"];
+        const colors = ["#c46868", "#c46868", "#ede5d4", "#7a9b7e", "#7a9b7e"];
         slider.style.setProperty("--thumb-color", colors[idx]);
       };
       slider.addEventListener("input", updateThumbColor);
