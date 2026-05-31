@@ -1,2583 +1,1980 @@
-const STORAGE_KEY = "food-match-profiles-v2";
-const METRICS_KEY = "food-match-metrics-v1";
-const VERSION = 2;
-const RECOMMENDABLE_KINDS = new Set(["food", "dynamic"]);
+(async function () {
+  "use strict";
 
-const RESTRICTIONS = [
-  { id: "no_restrictions", label: "No restrictions", emoji: "✅", filters: [] },
-  { id: "no_meat", label: "No meat", emoji: "🥩", filters: ["meat", "pork", "beef"] },
-  { id: "no_pork", label: "No pork", emoji: "🐖", filters: ["pork"] },
-  { id: "no_beef", label: "No beef", emoji: "🐄", filters: ["beef"] },
-  { id: "no_fish", label: "No fish", emoji: "🐟", filters: ["fish"] },
-  { id: "no_shellfish", label: "No shellfish", emoji: "🦐", filters: ["shellfish"] },
-  { id: "no_dairy", label: "No dairy", emoji: "🥛", filters: ["dairy"] },
-  { id: "no_gluten", label: "No gluten", emoji: "🌾", filters: ["gluten"] },
-  { id: "no_nuts", label: "No nuts", emoji: "🥜", filters: ["nut"] },
-  { id: "vegan", label: "Vegan", emoji: "🌱", filters: ["meat", "pork", "beef", "fish", "shellfish", "dairy", "egg", "honey"] },
-];
+  // ═══════════════════════════════════════════════════════════════
+  // FOOD MATCH — Adaptive Epicure Tasting Quiz
+  // Uses 1,790 ingredients and 150 modes from Epicure-Cooc
+  // ═══════════════════════════════════════════════════════════════
 
-const CARDS = [
-  {
-    id: "light_fresh_protein",
-    label: "Light + fresh protein plate",
-    emoji: "🥗",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Fresh vegetables, lean protein cues, and clean sauces.",
-    epicure: {
-      sourceModel: "core",
-      basis: "protein and fresh-vegetable modes",
-      ingredients: ["salad_greens", "cucumber", "arugula", "tofu", "chickpea", "quinoa"],
-      modes: ["usda_protein_g", "fg_Vegetable/Fresh salad and garden vegetables"],
-      poles: [],
-      coocSeeds: ["tofu", "chickpea", "cucumber"],
-    },
-    controversyWeight: 0,
-    restrictionTags: [],
-  },
-  {
-    id: "raw_chilled_small_plates",
-    label: "Raw + chilled small plates",
-    emoji: "🍣",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Sushi bar, crudo, oysters, chilled seafood, sharp condiments.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "seafood protein cluster and East Asian co-occurrence",
-      ingredients: ["tuna", "salmon", "oyster", "sea_urchin", "wasabi", "sushi_vinegar", "cucumber"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_meaty/Japanese umami seafood and dashi ingredients"],
-      poles: ["cuisine:East_Asian", "cuisine:Western_Atlantic"],
-      coocSeeds: ["salmon", "tuna", "wasabi"],
-    },
-    controversyWeight: 2,
-    restrictionTags: ["fish", "shellfish"],
-  },
-  {
-    id: "mediterranean_share",
-    label: "Mediterranean share plate",
-    emoji: "🥙",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Hummus, tahini, eggplant, olives, cucumbers, herbs.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "Mediterranean savory pantry co-occurrence",
-      ingredients: ["chickpea", "tahini", "olive_oil", "cucumber", "eggplant", "olive"],
-      modes: ["cf_savory/Mediterranean savory herbs and cheeses", "fg_Vegetable/Fresh whole vegetables and aromatics"],
-      poles: ["cuisine:Mediterranean"],
-      coocSeeds: ["chickpea", "tahini", "eggplant"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "spicy_east_asian_table",
-    label: "Spicy East Asian table",
-    emoji: "🌶️",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Chili oil, fermented sauces, tofu, cabbage, numbing spice.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "East Asian savory pantry and fermented sauce modes",
-      ingredients: ["sichuan_peppercorn", "chili_oil", "gochujang", "kimchi", "tofu", "napa_cabbage"],
-      modes: ["cf_balsamic/East Asian fermented sauces and aromatics", "fg_Pantry/East Asian umami sauces and condiments"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["sichuan_peppercorn", "chili_oil", "tofu"],
-    },
-    controversyWeight: 2,
-    restrictionTags: [],
-  },
-  {
-    id: "latin_taco_spread",
-    label: "Chile + corn taco spread",
-    emoji: "🌮",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Corn tortillas, salsa, chiles, herbs, beans.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "Latin American chile and corn co-occurrence",
-      ingredients: ["corn_tortilla", "salsa", "chipotle_pepper", "poblano_pepper", "coriander", "black_bean"],
-      modes: ["cf_minty/Mexican and Latin American chiles", "sweet_score/Latin American chiles and dried peppers"],
-      poles: ["cuisine:Latin_American"],
-      coocSeeds: ["corn_tortilla", "salsa", "chipotle_pepper"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "south_asian_spiced_plate",
-    label: "South Asian spiced plate",
-    emoji: "🍛",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Warm spices, legumes, herbs, aromatic seeds.",
-    epicure: {
-      sourceModel: "core",
-      basis: "South Asian cuisine pole and aromatic spice mode",
-      ingredients: ["turmeric", "cumin", "coriander", "mustard_seed", "fenugreek_seed", "chickpea"],
-      modes: ["cf_minty/South Asian aromatic whole spices", "fg_Spice/Pan-Asian aromatic whole spices and masalas"],
-      poles: ["cuisine:South_Asian"],
-      coocSeeds: ["turmeric", "cumin", "coriander"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "brothy_noodle_table",
-    label: "Brothy noodle table",
-    emoji: "🍜",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Rice noodles, tofu, mushrooms, greens, warm broth.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "East Asian savory broth and noodle co-occurrence",
-      ingredients: ["vegetable_stock", "rice_noodle", "tofu", "napa_cabbage", "enoki_mushroom", "shiitake_mushroom"],
-      modes: ["F_2/East Asian savory broth ingredients", "cf_savory/East Asian savory pantry staples"],
-      poles: ["cuisine:East_Asian", "cuisine:Southeast_Asian"],
-      coocSeeds: ["rice_noodle", "tofu", "napa_cabbage"],
-    },
-    controversyWeight: 0,
-    restrictionTags: [],
-  },
-  {
-    id: "cheese_cured_plate",
-    label: "Rich cheese + cured plate",
-    emoji: "🧀",
-    category: "Meal shape",
-    kind: "meal",
-    description: "Aged cheeses, olives, salami, cured and fatty flavors.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "dairy, cured-meat, and caloric-density modes",
-      ingredients: ["goat_cheese", "fontina_cheese", "blue_cheese", "olive", "salami", "bacon"],
-      modes: ["fg_Dairy/European melting and table cheeses", "cf_earthy/Aged and semi-firm savory cheeses"],
-      poles: ["cuisine:Mediterranean", "cuisine:Western_Atlantic"],
-      coocSeeds: ["fontina_cheese", "blue_cheese", "olive"],
-    },
-    controversyWeight: 2,
-    restrictionTags: ["dairy", "meat", "pork"],
-  },
-  {
-    id: "chili_heat",
-    label: "Chili heat",
-    emoji: "🔥",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Hot sauce, chili oil, fresh peppers, numbing spice.",
-    epicure: {
-      sourceModel: "core",
-      basis: "spice, pungent, woody, and chile modes",
-      ingredients: ["chili_oil", "sichuan_peppercorn", "habanero_pepper", "sriracha", "gochujang"],
-      modes: ["fg_Spice/Pungent chiles and warm spices", "cf_woody/Dried and fresh New World chiles"],
-      poles: [],
-      coocSeeds: ["chili_oil", "sriracha", "habanero_pepper"],
-    },
-    controversyWeight: 2,
-    restrictionTags: [],
-  },
-  {
-    id: "bright_tangy",
-    label: "Bright + tangy",
-    emoji: "🍋",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Citrus, vinegar, pickled ginger, sharp acidity.",
-    epicure: {
-      sourceModel: "core",
-      basis: "sour and citrus compound-feature modes",
-      ingredients: ["yuzu", "orange", "rice_vinegar", "balsamic_vinegar", "pickled_ginger"],
-      modes: ["sour_score", "cf_citrus/Citrus-floral fruits and aromatic liqueurs"],
-      poles: [],
-      coocSeeds: ["rice_vinegar", "pickled_ginger", "yuzu"],
-    },
-    controversyWeight: 0,
-    restrictionTags: [],
-  },
-  {
-    id: "umami_earthy",
-    label: "Umami + earthy",
-    emoji: "🍄",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Mushrooms, miso, soy, dark savory depth.",
-    epicure: {
-      sourceModel: "chem",
-      basis: "umami and earthy chemistry-aware modes",
-      ingredients: ["mushroom", "shiitake_mushroom", "miso", "soy_sauce", "portobello_mushroom"],
-      modes: ["umami_score/East Asian mushrooms and umami staples", "cf_earthy"],
-      poles: [],
-      coocSeeds: ["miso", "shiitake_mushroom", "soy_sauce"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "fermented_funky",
-    label: "Fermented + funky",
-    emoji: "🧪",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Kimchi, natto, fermented tofu, black bean funk.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "fermented sauce and processed-staple modes",
-      ingredients: ["kimchi", "natto", "miso", "fermented_tofu", "fermented_black_bean"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["kimchi", "natto", "miso"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "garlic_onion",
-    label: "Garlicky + oniony",
-    emoji: "🧄",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Garlic, red onion, shallot, scallion, chives.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "pungent aromatic vegetable modes",
-      ingredients: ["garlic", "red_onion", "shallot", "scallion", "chive"],
-      modes: ["pungent_score/Savory aromatic vegetables and seasonings"],
-      poles: [],
-      coocSeeds: ["garlic", "red_onion", "scallion"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "briny_pickled",
-    label: "Briny + pickled",
-    emoji: "🫒",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Olives, capers, pickled cucumber, pickled ginger, pickled radish.",
-    epicure: {
-      sourceModel: "core",
-      basis: "balsamic, sour, and pantry-preserved modes",
-      ingredients: ["olive", "caper", "pickled_cucumber", "pickled_ginger", "pickled_radish"],
-      modes: ["cf_balsamic", "sour_score"],
-      poles: ["cuisine:Mediterranean", "cuisine:East_Asian"],
-      coocSeeds: ["olive", "caper", "pickled_ginger"],
-    },
-    controversyWeight: 2,
-    restrictionTags: [],
-  },
-  {
-    id: "creamy_rich",
-    label: "Creamy + rich",
-    emoji: "🥛",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Cream, butter, yogurt, cheese, coconut milk.",
-    epicure: {
-      sourceModel: "core",
-      basis: "fatty and dairy modes",
-      ingredients: ["cream", "butter", "yogurt", "cheese", "coconut_milk"],
-      modes: ["fatty_score", "fg_Dairy/Creamy dairy and egg emulsions"],
-      poles: [],
-      coocSeeds: ["cream", "yogurt", "coconut_milk"],
-    },
-    controversyWeight: 0,
-    restrictionTags: ["dairy"],
-  },
-  {
-    id: "smoky_charred",
-    label: "Smoky + charred",
-    emoji: "🔥",
-    category: "Flavor lane",
-    kind: "flavor",
-    description: "Smoked paprika, chipotle, barbecue, liquid smoke.",
-    epicure: {
-      sourceModel: "core",
-      basis: "woody and chile-family modes",
-      ingredients: ["smoked_paprika", "chipotle_pepper", "barbecue_sauce", "liquid_smoke"],
-      modes: ["cf_woody/Dried and fresh New World chiles", "fg_Spice/Pungent chiles and warm spices"],
-      poles: ["cuisine:Latin_American", "cuisine:Western_Atlantic"],
-      coocSeeds: ["chipotle_pepper", "smoked_paprika", "barbecue_sauce"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "cilantro_coriander",
-    label: "Cilantro / coriander",
-    emoji: "🌿",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "A tiny herb with a giant compatibility signal.",
-    epicure: {
-      sourceModel: "core",
-      basis: "canonical herb ingredient and South Asian pole examples",
-      ingredients: ["coriander", "coriander_root"],
-      modes: ["cf_minty/South Asian aromatic whole spices", "fg_Spice/Pan-Asian aromatic whole spices and masalas"],
-      poles: ["cuisine:South_Asian", "cuisine:Latin_American"],
-      coocSeeds: ["coriander"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "olives",
-    label: "Olives",
-    emoji: "🫒",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Briny, oily, Mediterranean, polarizing.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "Mediterranean pantry and balsamic modes",
-      ingredients: ["olive", "black_olive", "green_olive", "olive_oil"],
-      modes: ["cf_savory/Mediterranean savory herbs and cheeses", "cf_balsamic/Mediterranean vinegars and peppery aromatics"],
-      poles: ["cuisine:Mediterranean"],
-      coocSeeds: ["olive", "olive_oil"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "mushrooms",
-    label: "Mushrooms",
-    emoji: "🍄",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Earthy, springy, umami, texture-forward.",
-    epicure: {
-      sourceModel: "chem",
-      basis: "umami mushroom modes and chemistry-aware similarity",
-      ingredients: ["mushroom", "shiitake_mushroom", "portobello_mushroom", "wood_ear_mushroom"],
-      modes: ["umami_score/East Asian mushrooms and umami staples", "cf_earthy"],
-      poles: [],
-      coocSeeds: ["shiitake_mushroom", "portobello_mushroom"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "blue_cheese",
-    label: "Blue cheese",
-    emoji: "🧀",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Salty, creamy, moldy, intense.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "dairy and European cheese modes",
-      ingredients: ["blue_cheese", "gorgonzola_cheese", "cheese"],
-      modes: ["fg_Dairy/European melting and table cheeses", "fatty_score/European artisan cheeses"],
-      poles: ["cuisine:Mediterranean", "cuisine:Western_Atlantic"],
-      coocSeeds: ["blue_cheese"],
-    },
-    controversyWeight: 4,
-    restrictionTags: ["dairy"],
-  },
-  {
-    id: "anchovy_sardine",
-    label: "Anchovies + sardines",
-    emoji: "🐟",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Tiny oily fish, salt, umami, intensity.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "fish and umami co-occurrence neighborhoods",
-      ingredients: ["anchovy", "sardine", "fish", "olive_oil"],
-      modes: ["cf_meaty/Japanese umami seafood and dashi ingredients", "cf_earthy/East-Asian seafood and umami proteins"],
-      poles: ["cuisine:Mediterranean", "cuisine:East_Asian"],
-      coocSeeds: ["anchovy", "sardine"],
-    },
-    controversyWeight: 4,
-    restrictionTags: ["fish"],
-  },
-  {
-    id: "oyster_uni",
-    label: "Oysters + uni",
-    emoji: "🦪",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Oceanic, slippery, mineral, raw-bar energy.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "seafood protein and raw-chilled co-occurrence",
-      ingredients: ["oyster", "sea_urchin", "clam", "sushi_vinegar"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_meaty/Japanese umami seafood and dashi ingredients"],
-      poles: ["cuisine:Western_Atlantic", "cuisine:East_Asian"],
-      coocSeeds: ["oyster", "sea_urchin"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["shellfish", "fish"],
-  },
-  {
-    id: "octopus_squid",
-    label: "Octopus + squid",
-    emoji: "🐙",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Chewy seafood and ink-friendly savory flavors.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "high-protein seafood mode and East Asian seafood mode",
-      ingredients: ["octopus", "squid", "squid_ink"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_earthy/East-Asian seafood and umami proteins"],
-      poles: ["cuisine:Mediterranean", "cuisine:East_Asian"],
-      coocSeeds: ["octopus", "squid"],
-    },
-    controversyWeight: 4,
-    restrictionTags: ["shellfish"],
-  },
-  {
-    id: "fish_sauce_shrimp_paste",
-    label: "Fish sauce + shrimp paste",
-    emoji: "🧂",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Deep fermented seafood salt and funk.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "Southeast Asian and East Asian umami pantry modes",
-      ingredients: ["fish_sauce", "shrimp_paste", "fermented_fish"],
-      modes: ["cf_earthy/East-Asian seafood and umami proteins", "cf_woody/Southeast Asian woody-spicy aromatics"],
-      poles: ["cuisine:Southeast_Asian", "cuisine:East_Asian"],
-      coocSeeds: ["fish_sauce", "shrimp_paste"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["fish", "shellfish"],
-  },
-  {
-    id: "kimchi_natto",
-    label: "Kimchi + natto",
-    emoji: "🥬",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Fermented, pungent, sour, sticky, alive-tasting.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "fermented East Asian staples and pantry modes",
-      ingredients: ["kimchi", "natto", "fermented_black_bean"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["kimchi", "natto"],
-    },
-    controversyWeight: 5,
-    restrictionTags: [],
-  },
-  {
-    id: "durian",
-    label: "Durian",
-    emoji: "🍈",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Creamy tropical fruit with maximum room-clearing power.",
-    epicure: {
-      sourceModel: "core",
-      basis: "canonical fruit ingredient with strong niche signal",
-      ingredients: ["durian"],
-      modes: ["fg_Fruit", "cf_sweet"],
-      poles: ["cuisine:Southeast_Asian"],
-      coocSeeds: ["durian"],
-    },
-    controversyWeight: 5,
-    restrictionTags: [],
-  },
-  {
-    id: "liver_offal",
-    label: "Liver + offal",
-    emoji: "🫀",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Mineral, iron-rich, old-school animal flavor.",
-    epicure: {
-      sourceModel: "core",
-      basis: "canonical organ-meat ingredients",
-      ingredients: ["liver", "offal", "blood_sausage"],
-      modes: ["cf_meaty", "usda_protein_g"],
-      poles: ["cuisine:Eastern_European", "cuisine:Western_Atlantic"],
-      coocSeeds: ["liver", "offal"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["meat", "pork"],
-  },
-  {
-    id: "bone_marrow",
-    label: "Bone marrow",
-    emoji: "🦴",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Fatty, roasted, primal, rich.",
-    epicure: {
-      sourceModel: "chem",
-      basis: "fatty and meaty chemistry-aware signals",
-      ingredients: ["bone_marrow"],
-      modes: ["fatty_score", "cf_meaty"],
-      poles: ["cuisine:Western_Atlantic"],
-      coocSeeds: ["bone_marrow"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["meat", "beef"],
-  },
-  {
-    id: "very_spicy_peppers",
-    label: "Very spicy peppers",
-    emoji: "🌶️",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Habanero, Sichuan peppercorn, chili oil.",
-    epicure: {
-      sourceModel: "core",
-      basis: "spice and pungent chile modes",
-      ingredients: ["habanero_pepper", "sichuan_peppercorn", "chili_oil", "birds_eye_chili"],
-      modes: ["fg_Spice/Pungent chiles and warm spices", "pungent_score"],
-      poles: ["cuisine:Latin_American", "cuisine:East_Asian", "cuisine:Southeast_Asian"],
-      coocSeeds: ["habanero_pepper", "sichuan_peppercorn"],
-    },
-    controversyWeight: 4,
-    restrictionTags: [],
-  },
-  {
-    id: "mayo_cottage",
-    label: "Mayo + cottage cheese",
-    emoji: "🥫",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Creamy, white, polarizing fridge staples.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "dairy and creamy emulsion modes",
-      ingredients: ["mayonnaise", "cottage_cheese"],
-      modes: ["fg_Dairy/Creamy dairy and egg emulsions", "fatty_score"],
-      poles: ["cuisine:Western_Atlantic"],
-      coocSeeds: ["mayonnaise", "cottage_cheese"],
-    },
-    controversyWeight: 4,
-    restrictionTags: ["dairy", "egg"],
-  },
-  {
-    id: "okra_eggplant",
-    label: "Okra + eggplant",
-    emoji: "🍆",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "Soft vegetable textures with big opinion range.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "vegetable and Mediterranean or South Asian co-occurrence",
-      ingredients: ["okra", "eggplant"],
-      modes: ["fg_Vegetable/Fresh whole vegetables and aromatics", "cf_savory/Mediterranean savory herbs and cheeses"],
-      poles: ["cuisine:Mediterranean", "cuisine:South_Asian"],
-      coocSeeds: ["okra", "eggplant"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "stinky_ferments",
-    label: "Stinky tofu + fermented fish",
-    emoji: "🧫",
-    category: "Weed-out food",
-    kind: "controversial",
-    description: "The unapologetic end of fermented food.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical fermented niche ingredients",
-      ingredients: ["stinky_tofu", "stinky_mandarin_fish", "fermented_fish"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["stinky_tofu", "fermented_fish"],
-    },
-    controversyWeight: 6,
-    restrictionTags: ["fish"],
-  },
-  {
-    id: "tahini_chickpea_followup",
-    label: "Tahini + chickpea",
-    emoji: "🌰",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from Mediterranean share plates.",
-    triggerIds: ["mediterranean_share", "briny_pickled"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "triggered by Mediterranean co-occurrence seeds",
-      ingredients: ["tahini", "chickpea", "olive_oil", "cumin"],
-      modes: ["cf_savory/Mediterranean savory herbs and cheeses", "usda_fiber_g/Fiber-rich herbs legumes and spices"],
-      poles: ["cuisine:Mediterranean"],
-      coocSeeds: ["tahini", "chickpea"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "eggplant_yogurt_followup",
-    label: "Eggplant + yogurt",
-    emoji: "🍆",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from Mediterranean and South Asian plates.",
-    triggerIds: ["mediterranean_share", "south_asian_spiced_plate", "okra_eggplant"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "eggplant plus creamy dairy co-occurrence",
-      ingredients: ["eggplant", "yogurt", "cumin", "coriander"],
-      modes: ["cf_savory/South Asian savory spice and vegetable pantry", "fg_Dairy/Creamy dairy and egg emulsions"],
-      poles: ["cuisine:Mediterranean", "cuisine:South_Asian"],
-      coocSeeds: ["eggplant", "yogurt"],
-    },
-    controversyWeight: 2,
-    restrictionTags: ["dairy"],
-  },
-  {
-    id: "wasabi_pickle_followup",
-    label: "Wasabi + pickled ginger",
-    emoji: "🍥",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from raw and chilled plates.",
-    triggerIds: ["raw_chilled_small_plates", "bright_tangy", "briny_pickled"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "sushi-adjacent condiment co-occurrence",
-      ingredients: ["wasabi", "pickled_ginger", "sushi_vinegar", "rice_vinegar"],
-      modes: ["cf_citrus/East Asian spicy fish and aromatics", "sour_score"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["wasabi", "pickled_ginger"],
-    },
-    controversyWeight: 2,
-    restrictionTags: [],
-  },
-  {
-    id: "miso_mushroom_followup",
-    label: "Miso + mushroom broth",
-    emoji: "🍲",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from brothy, umami, and mushroom likes.",
-    triggerIds: ["brothy_noodle_table", "umami_earthy", "mushrooms"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "miso, mushroom, and broth co-occurrence",
-      ingredients: ["miso", "shiitake_mushroom", "enoki_mushroom", "vegetable_stock", "tofu"],
-      modes: ["umami_score/East Asian mushrooms and umami staples", "F_2/East Asian savory broth ingredients"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["miso", "shiitake_mushroom", "tofu"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "sichuan_chili_followup",
-    label: "Sichuan pepper + chili oil",
-    emoji: "⚡",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from chili heat and East Asian spice.",
-    triggerIds: ["spicy_east_asian_table", "chili_heat", "very_spicy_peppers"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "East Asian aromatic spice co-occurrence",
-      ingredients: ["sichuan_peppercorn", "chili_oil", "napa_cabbage", "tofu"],
-      modes: ["cf_balsamic/East Asian fermented sauces and aromatics", "fg_Spice/Pungent chiles and warm spices"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["sichuan_peppercorn", "chili_oil"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "gochujang_kimchi_followup",
-    label: "Gochujang + kimchi",
-    emoji: "🥬",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from fermented and spicy East Asian cards.",
-    triggerIds: ["spicy_east_asian_table", "fermented_funky", "kimchi_natto"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "fermented sauce and cabbage co-occurrence",
-      ingredients: ["gochujang", "kimchi", "tofu", "sesame_oil"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["gochujang", "kimchi"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "corn_salsa_chile_followup",
-    label: "Corn tortilla + salsa verde",
-    emoji: "🌮",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from Latin American taco spread.",
-    triggerIds: ["latin_taco_spread", "smoky_charred", "very_spicy_peppers"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "Latin American cuisine pole and chile co-occurrence",
-      ingredients: ["corn_tortilla", "salsa_verde", "poblano_pepper", "chipotle_pepper"],
-      modes: ["cf_minty/Mexican and Latin American chiles", "cf_woody/Dried and fresh New World chiles"],
-      poles: ["cuisine:Latin_American"],
-      coocSeeds: ["corn_tortilla", "salsa_verde"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "cumin_coriander_followup",
-    label: "Cumin + coriander + chickpea",
-    emoji: "🧆",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from South Asian spice and cilantro likes.",
-    triggerIds: ["south_asian_spiced_plate", "cilantro_coriander", "tahini_chickpea_followup"],
-    epicure: {
-      sourceModel: "core",
-      basis: "South Asian pole and aromatic spice direction",
-      ingredients: ["cumin", "coriander", "chickpea", "turmeric"],
-      modes: ["cf_minty/South Asian aromatic whole spices", "cf_savory/South Asian savory spice and vegetable pantry"],
-      poles: ["cuisine:South_Asian"],
-      coocSeeds: ["cumin", "coriander", "chickpea"],
-    },
-    controversyWeight: 1,
-    restrictionTags: [],
-  },
-  {
-    id: "cheese_olive_followup",
-    label: "Funky cheese + olives",
-    emoji: "🧀",
-    category: "Epicure follow-up",
-    kind: "dynamic",
-    description: "Co-occurrence follow-up from cheese, olives, and briny likes.",
-    triggerIds: ["cheese_cured_plate", "blue_cheese", "olives", "briny_pickled"],
-    epicure: {
-      sourceModel: "cooc",
-      basis: "European cheese and Mediterranean pantry co-occurrence",
-      ingredients: ["blue_cheese", "goat_cheese", "olive", "black_olive"],
-      modes: ["fg_Dairy/European melting and table cheeses", "cf_balsamic/Mediterranean vinegars and peppery aromatics"],
-      poles: ["cuisine:Mediterranean", "cuisine:Western_Atlantic"],
-      coocSeeds: ["blue_cheese", "olive"],
-    },
-    controversyWeight: 4,
-    restrictionTags: ["dairy"],
-  },
-];
+  // ─── CONSTANTS ─────────────────────────────────────────────────
 
-const DETAIL_CARDS = [
-  {
-    id: "food_oysters",
-    label: "Oysters",
-    emoji: "🦪",
-    category: "Specific food",
-    kind: "food",
-    description: "Briny raw shellfish with a slippery, mineral bite.",
-    explain: "Oysters are usually served raw on the half shell with lemon, vinegar, or hot sauce. They are a strong signal for raw-bar comfort.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical shellfish protein in raw-bar neighborhoods",
-      ingredients: ["oyster", "lemon", "hot_sauce"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_meaty/Japanese umami seafood and dashi ingredients"],
-      poles: ["cuisine:Western_Atlantic", "cuisine:East_Asian"],
-      coocSeeds: ["oyster"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["shellfish"],
-  },
-  {
-    id: "food_uni",
-    label: "Uni",
-    emoji: "🟠",
-    category: "Specific food",
-    kind: "food",
-    description: "Sea urchin, creamy and oceanic, often served with sushi.",
-    explain: "Uni is the edible part of sea urchin. People often describe it as creamy, briny, sweet, and very ocean-forward.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical sea_urchin ingredient in sushi-adjacent space",
-      ingredients: ["sea_urchin", "sushi_vinegar", "wasabi"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_meaty/Japanese umami seafood and dashi ingredients"],
-      poles: ["cuisine:East_Asian", "cuisine:Western_Atlantic"],
-      coocSeeds: ["sea_urchin", "sushi_vinegar"],
-    },
-    controversyWeight: 6,
-    restrictionTags: ["fish", "shellfish"],
-  },
-  {
-    id: "food_crudo",
-    label: "Crudo / raw fish",
-    emoji: "🐟",
-    category: "Specific food",
-    kind: "food",
-    description: "Thin raw fish with citrus, oil, herbs, or salt.",
-    explain: "Crudo is a raw fish preparation. It is less sauce-heavy than many cooked dishes and is often bright, chilled, and delicate.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "raw and chilled fish ingredients plus citrus-acid modes",
-      ingredients: ["tuna", "salmon", "lemon", "olive_oil"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_citrus/Savory aromatic herbs and warm spices"],
-      poles: ["cuisine:Mediterranean", "cuisine:Western_Atlantic"],
-      coocSeeds: ["tuna", "salmon"],
-    },
-    controversyWeight: 3,
-    restrictionTags: ["fish"],
-  },
-  {
-    id: "food_kimchi",
-    label: "Kimchi",
-    emoji: "🥬",
-    category: "Specific food",
-    kind: "food",
-    description: "Spicy, sour fermented cabbage.",
-    explain: "Kimchi is fermented cabbage or vegetables, usually tangy, spicy, garlicky, and crunchy.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical fermented vegetable and East Asian pantry mode",
-      ingredients: ["kimchi", "napa_cabbage", "gochujang", "garlic"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["kimchi", "gochujang"],
-    },
-    controversyWeight: 4,
-    restrictionTags: [],
-  },
-  {
-    id: "food_miso",
-    label: "Miso",
-    emoji: "🍲",
-    category: "Specific food",
-    kind: "food",
-    description: "Savory fermented soybean paste.",
-    explain: "Miso is a fermented soybean paste used in soups, sauces, marinades, and dressings. It is salty and deeply umami.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical fermented soybean ingredient near broth and mushroom modes",
-      ingredients: ["miso", "tofu", "shiitake_mushroom", "vegetable_stock"],
-      modes: ["umami_score/East Asian mushrooms and umami staples", "F_2/East Asian savory broth ingredients"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["miso", "tofu"],
-    },
-    controversyWeight: 2,
-    restrictionTags: [],
-  },
-  {
-    id: "food_natto",
-    label: "Natto",
-    emoji: "🫘",
-    category: "Specific food",
-    kind: "food",
-    description: "Sticky fermented soybeans.",
-    explain: "Natto is fermented soybean with a sticky texture and strong aroma. It is a very high-signal compatibility food.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical fermented soybean ingredient",
-      ingredients: ["natto", "soy_sauce", "mustard"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["natto"],
-    },
-    controversyWeight: 6,
-    restrictionTags: [],
-  },
-  {
-    id: "food_fish_sauce",
-    label: "Fish sauce",
-    emoji: "🧂",
-    category: "Specific food",
-    kind: "food",
-    description: "Salty fermented fish condiment.",
-    explain: "Fish sauce is a fermented seafood condiment used in many Southeast and East Asian dishes. It can smell intense but adds deep savoriness.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical fermented seafood condiment in umami pantry space",
-      ingredients: ["fish_sauce", "fermented_fish", "lime", "chili_pepper"],
-      modes: ["cf_earthy/East-Asian seafood and umami proteins", "cf_woody/Southeast Asian woody-spicy aromatics"],
-      poles: ["cuisine:Southeast_Asian", "cuisine:East_Asian"],
-      coocSeeds: ["fish_sauce", "fermented_fish"],
-    },
-    controversyWeight: 6,
-    restrictionTags: ["fish"],
-  },
-  {
-    id: "food_stinky_tofu",
-    label: "Stinky tofu",
-    emoji: "🧫",
-    category: "Specific food",
-    kind: "food",
-    description: "Fermented tofu with a famously strong smell.",
-    explain: "Stinky tofu is fermented tofu. It can be fried or stewed and is known for a very intense aroma.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical stinky_tofu ingredient and fermented East Asian mode",
-      ingredients: ["stinky_tofu", "fermented_tofu", "tofu"],
-      modes: ["nova_level/East Asian umami pantry staples", "cf_balsamic/East Asian fermented sauces and aromatics"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["stinky_tofu", "fermented_tofu"],
-    },
-    controversyWeight: 7,
-    restrictionTags: [],
-  },
-  {
-    id: "food_olives",
-    label: "Olives",
-    emoji: "🫒",
-    category: "Specific food",
-    kind: "food",
-    description: "Briny cured fruit, usually salty and oily.",
-    explain: "Olives are cured, salty, and briny. They anchor a lot of Mediterranean pantry flavor.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical olive ingredients and Mediterranean pantry mode",
-      ingredients: ["olive", "black_olive", "green_olive", "olive_oil"],
-      modes: ["cf_savory/Mediterranean savory herbs and cheeses", "cf_balsamic/Mediterranean vinegars and peppery aromatics"],
-      poles: ["cuisine:Mediterranean"],
-      coocSeeds: ["olive", "olive_oil"],
-    },
-    controversyWeight: 4,
-    restrictionTags: [],
-  },
-  {
-    id: "food_anchovies",
-    label: "Anchovies",
-    emoji: "🐟",
-    category: "Specific food",
-    kind: "food",
-    description: "Small salty fish with concentrated umami.",
-    explain: "Anchovies are tiny cured fish. They can read as fishy, salty, or deeply savory depending on the dish.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical anchovy ingredient near briny and umami modes",
-      ingredients: ["anchovy", "olive_oil", "lemon"],
-      modes: ["cf_meaty/Japanese umami seafood and dashi ingredients", "cf_balsamic/Mediterranean vinegars and peppery aromatics"],
-      poles: ["cuisine:Mediterranean"],
-      coocSeeds: ["anchovy"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["fish"],
-  },
-  {
-    id: "food_pickles",
-    label: "Pickles",
-    emoji: "🥒",
-    category: "Specific food",
-    kind: "food",
-    description: "Crunchy, sour, salty preserved vegetables.",
-    explain: "Pickles here means sour preserved vegetables, like pickled cucumber, pickled radish, or pickled onion.",
-    epicure: {
-      sourceModel: "core",
-      basis: "canonical pickled vegetable ingredients and sour modes",
-      ingredients: ["pickled_cucumber", "pickled_radish", "pickled_onion", "rice_vinegar"],
-      modes: ["sour_score", "cf_balsamic"],
-      poles: ["cuisine:East_Asian", "cuisine:Western_Atlantic"],
-      coocSeeds: ["pickled_cucumber", "pickled_radish"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "food_shiitake",
-    label: "Shiitake mushrooms",
-    emoji: "🍄",
-    category: "Specific food",
-    kind: "food",
-    description: "Earthy, savory mushrooms.",
-    explain: "Shiitake mushrooms are meaty, earthy, and umami-heavy. They show up often in broths, stir-fries, and mushroom-forward dishes.",
-    epicure: {
-      sourceModel: "chem",
-      basis: "umami and earthy mushroom modes",
-      ingredients: ["shiitake_mushroom", "miso", "soy_sauce"],
-      modes: ["umami_score/East Asian mushrooms and umami staples", "cf_earthy"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["shiitake_mushroom", "miso"],
-    },
-    controversyWeight: 3,
-    restrictionTags: [],
-  },
-  {
-    id: "food_wood_ear_enoki",
-    label: "Wood ear + enoki",
-    emoji: "🍜",
-    category: "Specific food",
-    kind: "food",
-    description: "Crunchy or springy mushrooms with distinctive texture.",
-    explain: "Wood ear is crunchy and gelatinous; enoki is thin and springy. This card is mostly a texture test.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "East Asian vegetable and mushroom mode",
-      ingredients: ["wood_ear_mushroom", "enoki_mushroom", "napa_cabbage"],
-      modes: ["fg_Vegetable/East Asian mushrooms and greens", "cf_savory/East Asian savory pantry staples"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["wood_ear_mushroom", "enoki_mushroom"],
-    },
-    controversyWeight: 4,
-    restrictionTags: [],
-  },
-  {
-    id: "food_blue_cheese",
-    label: "Blue cheese",
-    emoji: "🧀",
-    category: "Specific food",
-    kind: "food",
-    description: "Funky, salty, sharp cheese.",
-    explain: "Blue cheese is aged with blue mold cultures. It is creamy, salty, and one of the best food-compatibility weed-outs.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical blue_cheese in dairy and fatty cheese modes",
-      ingredients: ["blue_cheese", "gorgonzola_cheese", "cheese"],
-      modes: ["fg_Dairy/European melting and table cheeses", "fatty_score/European artisan cheeses"],
-      poles: ["cuisine:Western_Atlantic", "cuisine:Mediterranean"],
-      coocSeeds: ["blue_cheese"],
-    },
-    controversyWeight: 6,
-    restrictionTags: ["dairy"],
-  },
-  {
-    id: "food_cottage_cheese",
-    label: "Cottage cheese",
-    emoji: "🥣",
-    category: "Specific food",
-    kind: "food",
-    description: "Mild curds with a lumpy creamy texture.",
-    explain: "Cottage cheese is less about strong flavor and more about texture. Some people love it, some people cannot do it.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical cottage_cheese ingredient in creamy dairy modes",
-      ingredients: ["cottage_cheese", "cream", "yogurt"],
-      modes: ["fg_Dairy/Creamy dairy and egg emulsions", "fatty_score"],
-      poles: ["cuisine:Western_Atlantic"],
-      coocSeeds: ["cottage_cheese"],
-    },
-    controversyWeight: 4,
-    restrictionTags: ["dairy"],
-  },
-  {
-    id: "food_liver",
-    label: "Liver",
-    emoji: "🫀",
-    category: "Specific food",
-    kind: "food",
-    description: "Mineral, iron-rich organ meat.",
-    explain: "Liver is an organ meat with a strong mineral flavor. It is a hard line for many people.",
-    epicure: {
-      sourceModel: "core",
-      basis: "canonical organ-meat ingredient",
-      ingredients: ["liver", "offal", "onion"],
-      modes: ["cf_meaty", "usda_protein_g"],
-      poles: ["cuisine:Eastern_European", "cuisine:Western_Atlantic"],
-      coocSeeds: ["liver", "offal"],
-    },
-    controversyWeight: 6,
-    restrictionTags: ["meat"],
-  },
-  {
-    id: "food_bone_marrow",
-    label: "Bone marrow",
-    emoji: "🦴",
-    category: "Specific food",
-    kind: "food",
-    description: "Roasted fatty marrow from bones.",
-    explain: "Bone marrow is rich, fatty, and usually scooped from roasted bones. It is less common but very revealing.",
-    epicure: {
-      sourceModel: "chem",
-      basis: "canonical bone_marrow ingredient with fatty and meaty signals",
-      ingredients: ["bone_marrow"],
-      modes: ["fatty_score", "cf_meaty"],
-      poles: ["cuisine:Western_Atlantic"],
-      coocSeeds: ["bone_marrow"],
-    },
-    controversyWeight: 6,
-    restrictionTags: ["meat", "beef"],
-  },
-  {
-    id: "food_sichuan_peppercorn",
-    label: "Sichuan peppercorn",
-    emoji: "⚡",
-    category: "Specific food",
-    kind: "food",
-    description: "Tingly, numbing spice.",
-    explain: "Sichuan peppercorn creates a numbing, buzzing sensation. It is not just heat, it is a mouthfeel.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical East Asian spice in pungent and balsamic modes",
-      ingredients: ["sichuan_peppercorn", "chili_oil", "green_sichuan_peppercorn"],
-      modes: ["cf_balsamic/East Asian fermented sauces and aromatics", "fg_Spice/Pungent chiles and warm spices"],
-      poles: ["cuisine:East_Asian"],
-      coocSeeds: ["sichuan_peppercorn", "chili_oil"],
-    },
-    controversyWeight: 5,
-    restrictionTags: [],
-  },
-  {
-    id: "food_habanero",
-    label: "Habanero-level heat",
-    emoji: "🌶️",
-    category: "Specific food",
-    kind: "food",
-    description: "Very hot fresh pepper intensity.",
-    explain: "Habanero is a very hot pepper with fruity aroma. This checks real heat tolerance, not just liking mild spice.",
-    epicure: {
-      sourceModel: "core",
-      basis: "canonical habanero_pepper in chile and spice modes",
-      ingredients: ["habanero_pepper", "chili_pepper"],
-      modes: ["fg_Spice/Pungent chiles and warm spices", "cf_minty/Mexican and Latin American chiles"],
-      poles: ["cuisine:Latin_American"],
-      coocSeeds: ["habanero_pepper"],
-    },
-    controversyWeight: 5,
-    restrictionTags: [],
-  },
-  {
-    id: "food_octopus",
-    label: "Octopus",
-    emoji: "🐙",
-    category: "Specific food",
-    kind: "food",
-    description: "Chewy seafood, often grilled or served chilled.",
-    explain: "Octopus can be tender or chewy depending on preparation. It is a seafood and texture compatibility test.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical octopus ingredient in seafood protein mode",
-      ingredients: ["octopus", "olive_oil", "lemon"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_earthy/East-Asian seafood and umami proteins"],
-      poles: ["cuisine:Mediterranean", "cuisine:East_Asian"],
-      coocSeeds: ["octopus"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["shellfish"],
-  },
-  {
-    id: "food_squid",
-    label: "Squid",
-    emoji: "🦑",
-    category: "Specific food",
-    kind: "food",
-    description: "Chewy seafood, sometimes served with squid ink.",
-    explain: "Squid is a texture-forward seafood. Squid ink adds dark, briny, savory flavor.",
-    epicure: {
-      sourceModel: "cooc",
-      basis: "canonical squid and squid_ink ingredients in seafood mode",
-      ingredients: ["squid", "squid_ink", "lemon"],
-      modes: ["usda_protein_g/High-protein seafood seeds and soy", "cf_earthy/East-Asian seafood and umami proteins"],
-      poles: ["cuisine:Mediterranean", "cuisine:East_Asian"],
-      coocSeeds: ["squid", "squid_ink"],
-    },
-    controversyWeight: 5,
-    restrictionTags: ["shellfish"],
-  },
-];
+  const STORAGE_KEY = "food-match-v3";
+  const VERSION = 3;
+  const MAX_PROFILES = 12;
+  const app = document.getElementById("app");
 
-CARDS.push(...DETAIL_CARDS);
+  const CUISINES = [
+    { id: "East_Asian", emoji: "\u{1F962}", label: "Soy, sesame & wok heat",
+      desc: "Stir-fried noodles, fried rice, dumplings, chili oil, soy-braised meats. The flavors of Chinese and Korean kitchens." },
+    { id: "Southeast_Asian", emoji: "\u{1F35C}", label: "Fish sauce, coconut & lime",
+      desc: "Pho, pad thai, laksa, fresh spring rolls, lemongrass curries, sambal. Bright, punchy, herbal." },
+    { id: "South_Asian", emoji: "\u{1F35B}", label: "Cumin, turmeric & slow-cooked dal",
+      desc: "Butter chicken, biryani, chana masala, dosa, raita. Warm spice layers built over time." },
+    { id: "Mediterranean", emoji: "\u{1FAD2}", label: "Olive oil, herbs & mezze",
+      desc: "Hummus, grilled halloumi, pasta al pomodoro, Greek salad, flatbreads, tahini. Sun-warmed simplicity." },
+    { id: "Latin_American", emoji: "\u{1F32E}", label: "Chiles, corn & salsa verde",
+      desc: "Tacos al pastor, ceviche, black beans, mole, arepas, chimichurri. Bright heat and fresh acid." },
+    { id: "Western_Atlantic", emoji: "\u{1F969}", label: "Butter, roasts & comfort food",
+      desc: "Steak frites, mac and cheese, roast chicken, charcuterie boards, sourdough. Rich, familiar, hearty." },
+    { id: "Japanese", emoji: "\u{1F363}", label: "Dashi, raw fish & pickles",
+      desc: "Sushi, ramen, miso soup, tempura, tsukemono, natto. Clean umami and precise textures." },
+  ];
 
-const DETAIL_ROUTES = {
-  raw_chilled_small_plates: ["food_oysters", "food_uni", "food_crudo", "food_octopus", "food_squid"],
-  fermented_funky: ["food_kimchi", "food_miso", "food_natto", "food_fish_sauce", "food_stinky_tofu"],
-  briny_pickled: ["food_olives", "food_anchovies", "food_pickles", "food_fish_sauce"],
-  umami_earthy: ["food_shiitake", "food_wood_ear_enoki", "food_miso"],
-  mushrooms: ["food_shiitake", "food_wood_ear_enoki"],
-  cheese_cured_plate: ["food_blue_cheese", "food_olives", "food_cottage_cheese"],
-  blue_cheese: ["food_blue_cheese"],
-  anchovy_sardine: ["food_anchovies"],
-  oyster_uni: ["food_oysters", "food_uni"],
-  octopus_squid: ["food_octopus", "food_squid"],
-  fish_sauce_shrimp_paste: ["food_fish_sauce"],
-  kimchi_natto: ["food_kimchi", "food_natto"],
-  liver_offal: ["food_liver", "food_bone_marrow"],
-  bone_marrow: ["food_bone_marrow"],
-  very_spicy_peppers: ["food_sichuan_peppercorn", "food_habanero"],
-  mayo_cottage: ["food_cottage_cheese"],
-  stinky_ferments: ["food_stinky_tofu", "food_fish_sauce"],
-  spicy_east_asian_table: ["food_sichuan_peppercorn", "food_kimchi", "food_miso"],
-};
+  const RESTRICTIONS = [
+    { id: "none", label: "No restrictions", emoji: "\u2705", tags: [] },
+    { id: "vegetarian", label: "Vegetarian", emoji: "\u{1F966}", tags: ["meat", "poultry", "fish", "shellfish"] },
+    { id: "vegan", label: "Vegan", emoji: "\u{1F331}", tags: ["meat", "poultry", "fish", "shellfish", "dairy", "egg", "honey"] },
+    { id: "no_pork", label: "No pork", emoji: "\u{1F416}", tags: ["pork"] },
+    { id: "no_beef", label: "No beef", emoji: "\u{1F404}", tags: ["beef"] },
+    { id: "no_seafood", label: "No seafood", emoji: "\u{1F41F}", tags: ["fish", "shellfish"] },
+    { id: "no_dairy", label: "No dairy", emoji: "\u{1F95B}", tags: ["dairy"] },
+    { id: "no_gluten", label: "No gluten", emoji: "\u{1F33E}", tags: ["gluten"] },
+    { id: "no_nuts", label: "No nuts", emoji: "\u{1F95C}", tags: ["nut"] },
+  ];
 
-Object.entries(DETAIL_ROUTES).forEach(([cardId, detailIds]) => {
-  const card = CARDS.find((item) => item.id === cardId);
-  if (card) card.detailIds = detailIds;
-});
-
-const DAYLIST_WORDS = {
-  raw_chilled_small_plates: ["raw bar", "chilled"],
-  food_oysters: ["oyster"],
-  food_uni: ["uni"],
-  food_crudo: ["crudo"],
-  food_octopus: ["octopus"],
-  food_squid: ["squid ink"],
-  oyster_uni: ["raw bar"],
-  octopus_squid: ["chewy seafood"],
-  fermented_funky: ["fermented"],
-  food_kimchi: ["kimchi"],
-  food_miso: ["miso"],
-  food_natto: ["natto"],
-  food_fish_sauce: ["fish sauce"],
-  food_stinky_tofu: ["stinky tofu"],
-  kimchi_natto: ["fermented"],
-  gochujang_kimchi_followup: ["gochujang"],
-  briny_pickled: ["briny"],
-  olives: ["olive"],
-  food_olives: ["olive"],
-  anchovy_sardine: ["anchovy"],
-  food_anchovies: ["anchovy"],
-  food_pickles: ["pickle"],
-  umami_earthy: ["umami"],
-  mushrooms: ["mushroom"],
-  food_shiitake: ["shiitake"],
-  food_wood_ear_enoki: ["wood ear"],
-  spicy_east_asian_table: ["chili oil"],
-  chili_heat: ["chili"],
-  food_sichuan_peppercorn: ["sichuan tingle"],
-  food_habanero: ["habanero"],
-  mediterranean_share: ["mezze"],
-  tahini_chickpea_followup: ["tahini"],
-  eggplant_yogurt_followup: ["eggplant yogurt"],
-  latin_taco_spread: ["salsa verde"],
-  south_asian_spiced_plate: ["cumin coriander"],
-  brothy_noodle_table: ["brothy noodle"],
-  cheese_cured_plate: ["cheese board"],
-  food_blue_cheese: ["blue cheese"],
-  food_cottage_cheese: ["cottage cheese"],
-  liver_offal: ["liver"],
-  food_liver: ["liver"],
-  bone_marrow: ["bone marrow"],
-  food_bone_marrow: ["bone marrow"],
-  fish_sauce_shrimp_paste: ["fish sauce"],
-  light_fresh_protein: ["fresh protein"],
-  bright_tangy: ["bright tangy"],
-  garlicky_onion: ["garlic"],
-  creamy_rich: ["creamy"],
-  smoky_charred: ["smoky"],
-};
-
-const state = {
-  route: "quiz",
-  incomingProfile: null,
-  compareProfiles: null,
-  selectedProfile: null,
-  toast: "",
-  quiz: makeEmptyQuiz(),
-};
-
-const app = document.querySelector("#app");
-
-function makeEmptyQuiz() {
-  return {
-    phase: "restrictions",
-    name: "",
-    restrictions: [],
-    queue: [],
-    index: 0,
-    responses: {},
+  // Featured ingredients: [emoji, description, controversy 0-10]
+  const FEAT = {
+    kimchi: ["\u{1F96C}", "Spicy fermented cabbage, tangy and crunchy", 4],
+    natto: ["\u{1FAD8}", "Sticky fermented soybeans, pungent and slimy", 8],
+    miso: ["\u{1F372}", "Fermented soybean paste, deeply savory", 2],
+    fish_sauce: ["\u{1F9C2}", "Concentrated fermented fish, salty and funky", 6],
+    soy_sauce: ["\u{1F9C8}", "Fermented soybean condiment, salty and rich", 1],
+    gochujang: ["\u{1F336}\uFE0F", "Korean fermented chili paste, sweet and spicy", 3],
+    oyster: ["\u{1F9AA}", "Raw shellfish, briny and mineral", 6],
+    sea_urchin: ["\u{1F7E0}", "Creamy, intensely oceanic sea creature", 8],
+    octopus: ["\u{1F419}", "Chewy seafood, often grilled or braised", 5],
+    squid: ["\u{1F991}", "Tender or chewy seafood, sometimes with ink", 4],
+    anchovy: ["\u{1F41F}", "Tiny cured fish, concentrated umami", 5],
+    sardine: ["\u{1F41F}", "Small oily fish, rich and briny", 4],
+    salmon: ["\u{1F41F}", "Fatty fish, raw or cooked, versatile", 1],
+    tuna: ["\u{1F41F}", "Meaty fish, often raw in sushi", 2],
+    shrimp: ["\u{1F990}", "Sweet shellfish, versatile and popular", 1],
+    crab: ["\u{1F980}", "Sweet, delicate shellfish", 2],
+    lobster: ["\u{1F99E}", "Rich, sweet, celebratory shellfish", 1],
+    eel: ["\u{1F40D}", "Rich, slightly sweet grilled fish", 5],
+    abalone: ["\u{1F41A}", "Chewy, prized sea snail", 6],
+    blue_cheese: ["\u{1F9C0}", "Sharp, pungent, veined cheese", 6],
+    goat_cheese: ["\u{1F9C0}", "Tangy, creamy, slightly barnyard", 4],
+    brie: ["\u{1F9C0}", "Soft, creamy, mild French cheese", 2],
+    parmesan: ["\u{1F9C0}", "Hard, nutty, umami-rich aged cheese", 1],
+    cottage_cheese: ["\u{1F9C0}", "Lumpy, mild, creamy fresh cheese", 4],
+    feta: ["\u{1F9C0}", "Salty, crumbly, tangy Greek cheese", 2],
+    gruyere: ["\u{1F9C0}", "Nutty, melting Swiss cheese", 1],
+    camembert: ["\u{1F9C0}", "Soft-ripened, earthy French cheese", 3],
+    liver: ["\u{1FAC0}", "Iron-rich organ meat, mineral and dense", 7],
+    bone_marrow: ["\u{1F9B4}", "Fatty, roasted, primal richness", 6],
+    tripe: ["\u{1F356}", "Honeycomb stomach lining, chewy texture", 7],
+    sweetbread: ["\u{1F356}", "Thymus gland, creamy when fried", 7],
+    blood_sausage: ["\u{1F356}", "Rich, iron-heavy sausage with blood", 7],
+    durian: ["\u{1F348}", "Creamy tropical fruit, famously pungent", 9],
+    jackfruit: ["\u{1F34C}", "Large tropical fruit, meaty texture", 3],
+    passion_fruit: ["\u{1F34A}", "Tart, aromatic tropical fruit", 2],
+    pomegranate: ["\u{1F34E}", "Jewel-like seeds, sweet-tart juice", 1],
+    fig: ["\u{1F95D}", "Honey-sweet, jammy, seedy fruit", 2],
+    lychee: ["\u{1F352}", "Floral, juicy tropical fruit", 2],
+    mango: ["\u{1F96D}", "Sweet, tropical, creamy flesh", 1],
+    tamarind: ["\u{1F330}", "Sour-sweet tropical pod, tangy paste", 3],
+    persimmon: ["\u{1F34A}", "Honey-sweet, custardy when ripe", 3],
+    habanero_pepper: ["\u{1F336}\uFE0F", "Extremely hot pepper with fruity aroma", 6],
+    sichuan_peppercorn: ["\u{1F336}\uFE0F", "Numbing, buzzing, electric mouth sensation", 5],
+    chili_oil: ["\u{1F336}\uFE0F", "Spicy, fragrant, red-tinged oil", 3],
+    wasabi: ["\u{1F96C}", "Sharp nasal heat, clears sinuses", 4],
+    horseradish: ["\u{1F96C}", "Pungent root, sharp and sinus-clearing", 3],
+    birds_eye_chili: ["\u{1F336}\uFE0F", "Small, fiery Southeast Asian pepper", 5],
+    chipotle_pepper: ["\u{1F336}\uFE0F", "Smoked dried jalape\u00F1o, deep heat", 2],
+    black_truffle: ["\u{1F344}", "Earthy, musky, luxurious fungus", 4],
+    white_truffle: ["\u{1F344}", "Intensely aromatic, rare luxury fungus", 5],
+    truffle_oil: ["\u{1F344}", "Earthy, musky flavored oil", 3],
+    shiitake_mushroom: ["\u{1F344}", "Meaty, earthy, umami-rich mushroom", 2],
+    enoki_mushroom: ["\u{1F344}", "Delicate, crunchy, mild mushroom", 2],
+    wood_ear_mushroom: ["\u{1F344}", "Crunchy, gelatinous, texturally odd", 4],
+    oyster_mushroom: ["\u{1F344}", "Mild, velvety, slightly seafood-like", 2],
+    coriander: ["\u{1F33F}", "Love-it-or-hate-it herb, bright and soapy to some", 5],
+    lemongrass: ["\u{1F33F}", "Citrusy, fragrant Southeast Asian herb", 2],
+    galangal: ["\u{1FAD0}", "Ginger-like rhizome, sharp and piney", 3],
+    turmeric: ["\u{1FAD0}", "Earthy, golden, mildly bitter spice", 2],
+    saffron: ["\u{1F33B}", "Floral, honey-like, world's most expensive spice", 2],
+    cardamom: ["\u{1F33F}", "Intensely aromatic, slightly mentholated", 2],
+    star_anise: ["\u2B50", "Sweet licorice-like warming spice", 3],
+    cumin: ["\u{1F33F}", "Earthy, warm, essential to many cuisines", 2],
+    fenugreek_seed: ["\u{1F33F}", "Maple-like aroma, slightly bitter", 3],
+    asafoetida: ["\u{1F33F}", "Pungent sulfurous spice, mellows when cooked", 5],
+    tofu: ["\u{1F9C6}", "Mild soy curd, absorbs surrounding flavors", 2],
+    tempeh: ["\u{1F9C6}", "Fermented soybean cake, nutty and firm", 3],
+    stinky_tofu: ["\u{1F9EB}", "Fermented tofu with a famously intense smell", 9],
+    fermented_black_bean: ["\u{1FAD8}", "Salty, pungent preserved soybeans", 4],
+    shrimp_paste: ["\u{1F9C2}", "Concentrated fermented shrimp, powerfully funky", 7],
+    okra: ["\u{1F33F}", "Pod vegetable, slimy when cooked, divisive texture", 5],
+    eggplant: ["\u{1F346}", "Soft, absorbent, mildly bitter vegetable", 3],
+    beet: ["\u{1F96C}", "Earthy, sweet, stains everything purple", 3],
+    brussels_sprout: ["\u{1F966}", "Mini cabbage, bitter when undercooked", 4],
+    artichoke: ["\u{1F33F}", "Thistle vegetable, nutty and complex", 3],
+    fennel: ["\u{1F33F}", "Anise-flavored bulb, crunchy raw, sweet cooked", 4],
+    olive: ["\u{1FAD2}", "Briny, oily, salty cured fruit", 3],
+    caper: ["\u{1F33F}", "Tiny briny buds, salty and tangy", 3],
+    arugula: ["\u{1F96C}", "Peppery, bitter salad green", 3],
+    nori: ["\u{1F33F}", "Dried seaweed sheet, umami and oceanic", 2],
+    wakame: ["\u{1F33F}", "Silky seaweed, slightly sweet", 3],
+    tahini: ["\u{1FAD8}", "Ground sesame paste, nutty and creamy", 2],
+    coconut_milk: ["\u{1F965}", "Rich, creamy tropical liquid", 1],
+    ghee: ["\u{1F9C8}", "Clarified butter, nutty and rich", 2],
+    duck: ["\u{1F986}", "Rich, fatty poultry with deep flavor", 3],
+    lamb: ["\u{1F411}", "Gamey, rich red meat", 4],
+    venison: ["\u{1F98C}", "Lean, gamey wild meat", 5],
+    rabbit: ["\u{1F407}", "Lean, mild, delicate white meat", 5],
+    foie_gras: ["\u{1F9C8}", "Fattened duck or goose liver, rich and silky", 7],
+    bacon: ["\u{1F953}", "Smoky, salty, crispy cured pork", 1],
+    prosciutto: ["\u{1F356}", "Dry-cured Italian ham, delicate and salty", 2],
+    matcha: ["\u{1F375}", "Ground green tea, vegetal and slightly bitter", 2],
+    rose_water: ["\u{1F339}", "Floral, perfumed, used in desserts", 3],
+    black_sesame: ["\u26AB", "Nutty, slightly bitter, aromatic seeds", 2],
+    taro: ["\u{1F360}", "Starchy root, mildly sweet, purple", 2],
+    avocado: ["\u{1F951}", "Creamy, mild, buttery fruit", 1],
+    mochi: ["\u{1F361}", "Chewy glutinous rice cake", 2],
+    nutritional_yeast: ["\u{1F9C0}", "Savory, cheesy-tasting deactivated yeast", 4],
+    kombucha: ["\u{1F375}", "Fizzy fermented tea, tangy and vinegary", 4],
+    pickled_cucumber: ["\u{1F952}", "Crunchy, sour, salty preserved cucumber", 2],
+    ginger: ["\u{1FAD0}", "Spicy, warming, zingy root", 1],
+    garlic: ["\u{1F9C4}", "Pungent, savory, essential aromatic", 1],
+    sesame_oil: ["\u{1F9C8}", "Nutty, toasty, aromatic oil", 1],
+    sriracha: ["\u{1F336}\uFE0F", "Garlicky, tangy hot sauce", 1],
+    mirin: ["\u{1F376}", "Sweet Japanese rice wine for cooking", 1],
+    rice_vinegar: ["\u{1F9C8}", "Mild, slightly sweet vinegar", 1],
+    dashi: ["\u{1F372}", "Japanese soup stock from kelp and bonito", 3],
+    bonito_flake: ["\u{1F41F}", "Smoky, umami dried fish shavings", 3],
+    seaweed: ["\u{1F33F}", "Ocean vegetables, mineral and umami", 3],
+    dried_shrimp: ["\u{1F990}", "Concentrated shrimp flavor, sweet and salty", 4],
+    century_egg: ["\u{1F95A}", "Preserved egg, creamy and sulfurous", 8],
+    jellyfish: ["\u{1FABC}", "Crunchy, gelatinous, mildly flavored", 7],
+    chicken_feet: ["\u{1F414}", "Gelatinous, collagen-rich, chewy", 7],
+    pig_ear: ["\u{1F416}", "Crunchy cartilage, chewy and gelatinous", 7],
+    sea_cucumber: ["\u{1F41A}", "Slippery, gelatinous ocean creature", 8],
+    balut: ["\u{1F95A}", "Fertilized duck egg with embryo", 9],
+    insects: ["\u{1F41B}", "Crickets, ants, larvae: crunchy protein", 8],
+    surstroemming: ["\u{1F41F}", "Swedish fermented herring, extremely pungent", 10],
+    casu_marzu: ["\u{1F9C0}", "Sardinian cheese with live insect larvae", 10],
+    black_garlic: ["\u{1F9C4}", "Aged garlic, sweet and molasses-like", 2],
+    sumac: ["\u{1F341}", "Tangy, lemony Middle Eastern spice", 2],
+    za_atar: ["\u{1F33F}", "Herby, tangy Middle Eastern spice blend", 2],
+    harissa: ["\u{1F336}\uFE0F", "Smoky, spicy North African chili paste", 2],
+    tahini: ["\u{1FAD8}", "Ground sesame paste, nutty and creamy", 2],
+    pomegranate_molasses: ["\u{1F34E}", "Tart, sweet, dark fruit reduction", 2],
+    labneh: ["\u{1F95B}", "Thick strained yogurt, tangy and creamy", 2],
   };
-}
 
-function cardById(id) {
-  return CARDS.find((card) => card.id === id);
-}
+  // Ingredients to never show as quiz cards
+  const SKIP_SET = new Set([
+    "salt", "sugar", "water", "ice", "oil", "flour", "baking_powder", "baking_soda",
+    "cooking_spray", "vegetable_oil", "canola_oil", "corn_starch", "vanilla_extract",
+    "food_coloring", "gelatin", "agar", "xanthan_gum", "citric_acid", "cream_of_tartar",
+    "yeast", "active_dry_yeast", "cornmeal", "all_purpose_flour", "bread_flour",
+    "powdered_sugar", "brown_sugar", "granulated_sugar", "light_corn_syrup",
+    "shortening", "margarine", "egg_substitute", "egg_white", "egg_yolk",
+    "heavy_cream", "half_and_half", "condensed_milk", "evaporated_milk",
+    "unsalted_butter", "salted_butter", "cooking_wine", "white_wine", "red_wine",
+    "rice", "white_rice", "jasmine_rice", "basmati_rice", "long_grain_rice",
+    "pasta", "spaghetti", "penne", "linguine", "macaroni",
+    "chicken_broth", "beef_broth", "vegetable_broth", "stock",
+    "black_pepper", "white_pepper", "garlic_powder", "onion_powder",
+    "dried_oregano", "dried_basil", "dried_thyme", "dried_parsley",
+    "ketchup", "mustard", "mayonnaise", "relish",
+    "lettuce", "tomato", "onion", "potato", "carrot", "celery",
+    "apple", "banana", "orange", "lemon", "lime", "grape",
+    "oregano", "parsley", "thyme", "olive_oil", "red_onion", "paprika",
+    "red_pepper", "bay_leaf", "rosemary", "basil", "chive", "dill",
+    "red_wine_vinegar", "white_wine_vinegar", "sour_cream", "cream_cheese",
+    "cheddar_cheese", "mozzarella_cheese", "butter", "milk", "cheese",
+    "chicken", "turkey", "beef", "pork", "ham",
+  ]);
 
-function selectedFilters(restrictionIds) {
-  const filters = new Set();
-  restrictionIds.forEach((id) => {
-    const restriction = RESTRICTIONS.find((item) => item.id === id);
-    restriction?.filters.forEach((filter) => filters.add(filter));
-  });
-  return filters;
-}
+  // Daylist vibe vocabulary
+  const VIBE = {
+    adventure: {
+      low: ["gentle", "familiar", "comfort", "cozy"],
+      mid: ["curious", "open", "roaming", "exploring"],
+      high: ["bold", "daring", "fearless", "untamed"],
+    },
+    flavor: {
+      umami: ["deep", "layered", "savory-dark"],
+      fresh: ["bright", "crisp", "verdant"],
+      rich: ["lush", "velvet", "indulgent"],
+      spicy: ["electric", "fiery", "charged"],
+      sweet: ["honeyed", "golden", "soft"],
+      earthy: ["smoky", "grounded", "ember"],
+      funky: ["wild", "alive", "feral"],
+      herbal: ["botanical", "sun-lit", "aromatic"],
+    },
+    culture: {
+      East_Asian: ["pacific", "eastern"],
+      Southeast_Asian: ["equatorial", "monsoon"],
+      South_Asian: ["aromatic", "spiced"],
+      Mediterranean: ["coastal", "sun-warmed"],
+      Latin_American: ["tropical", "new-world"],
+      Western_Atlantic: ["atlantic", "hearth-side"],
+      Japanese: ["zen", "island"],
+    },
+    time: {
+      morning: ["dawn", "sunrise", "early light"],
+      afternoon: ["golden hour", "midday sun"],
+      evening: ["twilight", "dusk", "amber hour"],
+      night: ["midnight", "late night", "moonlit"],
+    },
+  };
 
-function isCardAllowed(card, restrictionIds) {
-  const filters = selectedFilters(restrictionIds);
-  return !card.restrictionTags.some((tag) => filters.has(tag));
-}
+  // ─── STATE ─────────────────────────────────────────────────────
 
-function staticCardIds(restrictionIds) {
-  return CARDS
-    .filter((card) => !card.triggerIds)
-    .filter((card) => card.kind === "food")
-    .filter((card) => isCardAllowed(card, restrictionIds))
-    .map((card) => card.id);
-}
+  const state = {
+    route: "quiz",
+    quiz: null,
+    profile: null,
+    compareProfiles: null,
+    incomingProfile: null,
+    toast: "",
+  };
 
-function insertDetailCards(card) {
-  const detailIds = card.detailIds || [];
-  if (!detailIds.length) return;
+  let epicure = null; // loaded async
 
-  const queued = new Set(state.quiz.queue);
-  const detailCards = detailIds
-    .map(cardById)
-    .filter(Boolean)
-    .filter((item) => !queued.has(item.id))
-    .filter((item) => state.quiz.responses[item.id] === undefined)
-    .filter((item) => isCardAllowed(item, state.quiz.restrictions));
+  // ─── DATA LAYER ────────────────────────────────────────────────
 
-  if (!detailCards.length) return;
-  state.quiz.queue.splice(state.quiz.index + 1, 0, ...detailCards.map((item) => item.id));
-}
+  async function loadEpicure() {
+    const resp = await fetch("data/epicure.json");
+    const data = await resp.json();
+    return buildIndex(data);
+  }
 
-function maybeAppendDynamicCards(answeredCardId) {
-  const answeredCard = cardById(answeredCardId);
-  if (!answeredCard || state.quiz.responses[answeredCardId] !== true) return;
+  function buildIndex(data) {
+    const modeById = {};
+    data.modes.forEach((m) => { modeById[m.id] = m; });
 
-  const queued = new Set(state.quiz.queue);
-  for (const card of CARDS) {
-    if (!card.triggerIds || queued.has(card.id)) continue;
-    if (!isCardAllowed(card, state.quiz.restrictions)) continue;
-    if (card.triggerIds.includes(answeredCardId)) {
-      state.quiz.queue.push(card.id);
-      queued.add(card.id);
+    const ingredientModes = {};
+    data.modes.forEach((m) => {
+      m.members.forEach((ing) => {
+        if (!ingredientModes[ing]) ingredientModes[ing] = [];
+        ingredientModes[ing].push(m.id);
+      });
+    });
+
+    const ingredientSpecificity = {};
+    Object.entries(ingredientModes).forEach(([ing, modes]) => {
+      ingredientSpecificity[ing] = modes.length;
+    });
+
+    const modeCuisines = {};
+    Object.entries(data.cuisineProvenance).forEach(([cuisine, modeIds]) => {
+      modeIds.forEach((id) => {
+        if (!modeCuisines[id]) modeCuisines[id] = [];
+        modeCuisines[id].push(cuisine);
+      });
+    });
+
+    const quizModes = data.modes.filter((m) => {
+      if (m.id.startsWith("F_")) return false;
+      if (m.property === "nova_level") return false;
+      if (m.property.startsWith("usda_")) return false;
+      if (m.n < 15 || m.n > 250) return false;
+      const l = m.label.toLowerCase();
+      if (l.includes("spirit") || l.includes("liqueur") || l.includes("cocktail")) return false;
+      if (l.includes("confection") && !l.includes("ingredient")) return false;
+      if (l.includes("convenience") || l.includes("processed convenience")) return false;
+      if (l.includes("sweet fruit") && l.includes("liqueur")) return false;
+      if (l.includes("dessert") && l.includes("spirit")) return false;
+      return true;
+    });
+
+    return {
+      ingredients: new Set(data.ingredients),
+      modes: data.modes,
+      modeById,
+      ingredientModes,
+      ingredientSpecificity,
+      cuisineProvenance: data.cuisineProvenance,
+      modeCuisines,
+      quizModes,
+    };
+  }
+
+  // ─── INGREDIENT UTILS ─────────────────────────────────────────
+
+  function getIngredientTags(name) {
+    const tags = new Set();
+    const n = name.toLowerCase();
+    if (/^(beef|steak|veal|brisket|oxtail)/.test(n) || /beef/.test(n)) { tags.add("meat"); tags.add("beef"); }
+    if (/^(pork|bacon|ham|prosciutto|pancetta|lard|chorizo|guanciale|lardo|sopressata)/.test(n) || /pork|ham/.test(n)) { tags.add("meat"); tags.add("pork"); }
+    if (/^(chicken|turkey|duck|goose|quail|pheasant|cornish|poultry)/.test(n)) { tags.add("meat"); tags.add("poultry"); }
+    if (/^(lamb|mutton|goat_meat)/.test(n)) tags.add("meat");
+    if (/^(venison|rabbit|bison|elk|boar|alligator|frog)/.test(n)) tags.add("meat");
+    if (/^(liver|offal|tripe|sweetbread|bone_marrow|blood|tongue|heart|kidney|gizzard|pig_ear|chicken_feet)/.test(n)) tags.add("meat");
+    if (/sausage|salami|pepperoni|bresaola|jerky|hot_dog|meatball|meat_stock|andouille/.test(n)) tags.add("meat");
+    if (/balut/.test(n)) tags.add("meat");
+    if (/^(salmon|tuna|cod|bass|trout|mackerel|sardine|anchovy|eel|swordfish|halibut|snapper|grouper|mahi|tilapia|catfish|herring|pike|perch|flounder|sole|skate|monkfish|barramundi|branzino|arctic_char|amberjack|carp|bonito|dace|pomfret|yellowtail)/.test(n)) tags.add("fish");
+    if (/^fish|fish_sauce|fish_cake|dried_fish|fermented_fish|bonito_flake|dashi/.test(n)) tags.add("fish");
+    if (/surstr/.test(n)) tags.add("fish");
+    if (/^(shrimp|crab|lobster|clam|mussel|oyster|squid|octopus|scallop|crawfish|prawn|langoustine|abalone|sea_urchin|sea_cucumber|conch|whelk|snail|calamari|cockle|geoduck|jellyfish)/.test(n)) tags.add("shellfish");
+    if (/shrimp_paste|dried_shrimp|oyster_sauce/.test(n)) tags.add("shellfish");
+    if (/cheese|cream(?!.*tartar)|(?<!\w)milk(?!.*coconut|.*almond|.*soy|.*oat|.*rice)|butter(?!.*peanut|.*almond|.*sun)|yogurt|ghee|whey|curd|paneer|kefir|labneh|clotted|cr.me_fra.che|mascarpone|ricotta|mozzarella|parmesan|cheddar|gouda|brie|camembert|gruyere|feta|halloumi|manchego|pecorino|asiago|fontina|provolone|burrata|quark|cottage/.test(n)) tags.add("dairy");
+    if (/^egg$|^egg_/.test(n) || n === "mayonnaise" || n === "meringue" || n === "custard") tags.add("egg");
+    if (n === "honey") tags.add("honey");
+    if (/^(almond|walnut|pecan|cashew|pistachio|hazelnut|macadamia|pine_nut|brazil_nut|peanut|chestnut)/.test(n)) tags.add("nut");
+    if (/nut(?!meg|ella|ritional)/.test(n) && !n.includes("coconut") && !n.includes("butternut") && !n.includes("donut") && !n.includes("chestnut")) tags.add("nut");
+    if (/^(wheat|barley|rye|spelt|couscous|bread|flour|seitan|bagel|croissant|pita|naan|focaccia|ciabatta|sourdough|brioche)/.test(n)) tags.add("gluten");
+    if (n === "soy_sauce" || n === "light_soy_sauce" || n === "dark_soy_sauce") tags.add("gluten");
+    return tags;
+  }
+
+  function isIngredientAllowed(name, restrictions) {
+    if (!restrictions || !restrictions.length) return true;
+    const tags = getIngredientTags(name);
+    if (!tags.size) return true;
+    const blocked = new Set();
+    restrictions.forEach((r) => {
+      const rest = RESTRICTIONS.find((x) => x.id === r);
+      if (rest) rest.tags.forEach((t) => blocked.add(t));
+    });
+    for (const tag of tags) {
+      if (blocked.has(tag)) return false;
+    }
+    return true;
+  }
+
+  function isModeAllowed(mode, restrictions) {
+    if (!restrictions || !restrictions.length) return true;
+    const blocked = new Set();
+    restrictions.forEach((r) => {
+      const rest = RESTRICTIONS.find((x) => x.id === r);
+      if (rest) rest.tags.forEach((t) => blocked.add(t));
+    });
+    const label = mode.label.toLowerCase();
+    if (blocked.has("fish") && (label.includes("seafood") || label.includes("fish") || label.includes("dashi"))) return false;
+    if (blocked.has("shellfish") && label.includes("seafood")) return false;
+    if (blocked.has("meat") && (label.includes("meat") || label.includes("cured") || label.includes("charcuterie"))) return false;
+    if (blocked.has("dairy") && (label.includes("cheese") || label.includes("dairy") || label.includes("cream"))) return false;
+    return true;
+  }
+
+  function displayName(ingredient) {
+    return ingredient
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
+  function ingredientEmoji(ingredient) {
+    const f = FEAT[ingredient];
+    return f ? f[0] : "\u{1F37D}\uFE0F";
+  }
+
+  function ingredientDesc(ingredient) {
+    const f = FEAT[ingredient];
+    if (f) return f[1];
+    const modes = epicure.ingredientModes[ingredient];
+    if (modes && modes.length) {
+      const mode = epicure.modeById[modes[0]];
+      if (mode) return `From the world of ${mode.label.toLowerCase()}`;
+    }
+    return displayName(ingredient);
+  }
+
+  function ingredientControversy(ingredient) {
+    const f = FEAT[ingredient];
+    if (f) return f[2] || 0;
+    const spec = epicure.ingredientSpecificity[ingredient] || 10;
+    return Math.max(0, Math.min(8, Math.round(10 - spec)));
+  }
+
+  // ─── QUIZ ENGINE ───────────────────────────────────────────────
+
+  function newQuiz(name, restrictions) {
+    const cuisineCards = CUISINES.map((c) => ({
+      id: "c:" + c.id,
+      type: "cuisine",
+      context: "Getting to know your taste",
+      label: c.label,
+      emoji: c.emoji,
+      desc: c.desc,
+      options: [
+        { label: "Love", value: 3, cls: "positive" },
+        { label: "Hate", value: -2, cls: "negative" },
+        { label: "Skip", value: "unknown", cls: "unknown" },
+      ],
+    }));
+
+    return {
+      name: (name || "").trim().slice(0, 40),
+      restrictions: restrictions || [],
+      phase: "cuisines",
+      queue: cuisineCards,
+      pos: 0,
+      responses: {},
+      modeCardsAdded: false,
+      ingredientCardsAdded: false,
+      probesInjected: new Set(),
+    };
+  }
+
+  function currentCard(quiz) {
+    return quiz.queue[quiz.pos] || null;
+  }
+
+  const QUIZ_TARGET = 50; // Target card count for a comprehensive profile
+
+  function quizProgress(quiz) {
+    const answered = quiz.pos;
+    // Show progress against a fixed target so it doesn't feel like it's growing
+    const pct = Math.min(100, Math.round((answered / QUIZ_TARGET) * 100));
+    return {
+      current: answered + 1,
+      total: QUIZ_TARGET,
+      phase: quiz.phase,
+      pct,
+    };
+  }
+
+  function respondToCard(quiz, value) {
+    const card = currentCard(quiz);
+    if (!card) return;
+    quiz.responses[card.id] = value;
+
+    // After any mode response, inject ingredient probes to get granular data.
+    // You might love olive oil but not the whole mezze platter.
+    // But respect the target card count so the quiz doesn't feel infinite.
+    const remaining = quiz.queue.length - quiz.pos;
+    const roomLeft = Math.max(0, QUIZ_TARGET - quiz.pos - remaining);
+
+    if (card.type === "mode" && !quiz.probesInjected.has(card.modeId)) {
+      quiz.probesInjected.add(card.modeId);
+      let probeCount;
+      if (value >= 3) probeCount = 4;        // strong like: dig deep
+      else if (value > 0) probeCount = 3;    // partial like: check specifics
+      else if (value === "unknown") probeCount = 2; // never tried: explore
+      else probeCount = 2;                   // disliked: still probe standout ingredients
+      probeCount = Math.min(probeCount, Math.max(1, roomLeft)); // respect target
+      const reason = value > 0 ? "You liked: " + card.label : value < 0 ? "Even though you passed on: " + card.label : "Related to: " + card.label;
+      const probes = selectProbesFromMode(card.modeId, probeCount, quiz, reason);
+      quiz.queue.splice(quiz.pos + 1, 0, ...probes);
+    }
+
+    quiz.pos++;
+
+    // Auto-finish if we've hit the target and have enough data
+    const answered = Object.keys(quiz.responses).length;
+    if (quiz.pos >= QUIZ_TARGET && answered >= 15) {
+      quiz.phase = "done";
+      return;
+    }
+
+    // Phase transitions
+    if (quiz.pos >= quiz.queue.length) {
+      if (quiz.phase === "cuisines" && !quiz.modeCardsAdded) {
+        quiz.phase = "modes";
+        quiz.modeCardsAdded = true;
+        const modeCards = selectModeCards(quiz);
+        quiz.queue.push(...modeCards);
+      } else if (quiz.phase === "modes" && !quiz.ingredientCardsAdded) {
+        quiz.phase = "ingredients";
+        quiz.ingredientCardsAdded = true;
+        const ingCards = selectBoundaryIngredients(quiz);
+        quiz.queue.push(...ingCards);
+      } else {
+        quiz.phase = "done";
+      }
+    } else {
+      // Check if phase label should change based on current card type
+      const next = currentCard(quiz);
+      if (next) {
+        if (next.type === "mode" || next.type === "ingredient-probe") quiz.phase = "modes";
+        if (next.type === "ingredient") quiz.phase = "ingredients";
+      }
     }
   }
-}
 
-function beginQuiz(incomingProfile = null) {
-  state.route = "quiz";
-  state.incomingProfile = incomingProfile;
-  state.compareProfiles = null;
-  state.selectedProfile = null;
-  state.quiz = makeEmptyQuiz();
-  render();
-}
+  function selectModeCards(quiz) {
+    const likedCuisines = new Set();
+    const cuisineScores = {};
+    CUISINES.forEach((c) => {
+      const resp = quiz.responses["c:" + c.id];
+      if (resp !== undefined && resp > 0) {
+        likedCuisines.add(c.id);
+        cuisineScores[c.id] = resp;
+      }
+    });
 
-function normalizeName(name) {
-  return String(name || "").trim().replace(/\s+/g, " ").slice(0, 40);
-}
+    if (!likedCuisines.size) {
+      CUISINES.forEach((c) => {
+        likedCuisines.add(c.id);
+        cuisineScores[c.id] = 0.5;
+      });
+    }
 
-function startCards() {
-  state.quiz.phase = "cards";
-  state.quiz.queue = staticCardIds(state.quiz.restrictions);
-  state.quiz.index = 0;
-  render();
-}
+    const scored = epicure.quizModes
+      .filter((m) => isModeAllowed(m, quiz.restrictions))
+      .map((m) => {
+        let score = 0;
+        score += modeCuisineRelevance(m, likedCuisines, cuisineScores);
+        score += modeInterestingness(m);
+        return { mode: m, score };
+      })
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score);
 
-function answerCurrent(answer) {
-  const id = state.quiz.queue[state.quiz.index];
-  if (!id) {
-    finishQuiz();
-    return;
+    const picked = [];
+    const seenProperties = {};
+    for (const s of scored) {
+      const prop = s.mode.property;
+      if ((seenProperties[prop] || 0) >= 2) continue;
+      seenProperties[prop] = (seenProperties[prop] || 0) + 1;
+      picked.push(s.mode);
+      if (picked.length >= 12) break;
+    }
+
+    return picked.map(makeModeCard);
   }
-  const card = cardById(id);
-  if (answer === "details") {
-    state.quiz.responses[id] = "details";
-    insertDetailCards(card);
-  } else {
-    state.quiz.responses[id] = answer;
+
+  function modeCuisineRelevance(mode, likedCuisines, cuisineScores) {
+    let score = 0;
+    const officialCuisines = epicure.modeCuisines[mode.id] || [];
+    officialCuisines.forEach((c) => {
+      if (likedCuisines.has(c)) score += (cuisineScores[c] || 1) * 1.5;
+    });
+
+    const label = mode.label.toLowerCase();
+    const keywords = {
+      East_Asian: ["east asian", "chinese", "japanese", "korean", "east-asian", "wok"],
+      Southeast_Asian: ["southeast asian", "thai", "vietnamese", "indonesian"],
+      South_Asian: ["south asian", "indian", "south-asian"],
+      Mediterranean: ["mediterranean", "italian", "greek", "turkish"],
+      Latin_American: ["latin american", "mexican", "tex-mex", "latin", "new world"],
+      Western_Atlantic: ["western", "american", "european", "atlantic", "french", "british"],
+      Japanese: ["japanese", "dashi", "miso"],
+    };
+    Object.entries(keywords).forEach(([cuisine, kws]) => {
+      if (likedCuisines.has(cuisine) && kws.some((kw) => label.includes(kw))) {
+        score += (cuisineScores[cuisine] || 1);
+      }
+    });
+
+    if (score === 0) score += 0.3;
+    return score;
   }
-  if (answer === true) maybeAppendDynamicCards(id);
-  state.quiz.index += 1;
-  if (state.quiz.index >= state.quiz.queue.length) {
-    finishQuiz();
-  } else {
+
+  function modeInterestingness(mode) {
+    let score = 0;
+    const label = mode.label.toLowerCase();
+    if (label.includes("ferment")) score += 3;
+    if (label.includes("umami")) score += 3;
+    if (label.includes("spice") || label.includes("chile") || label.includes("pepper")) score += 2;
+    if (label.includes("cheese")) score += 2;
+    if (label.includes("seafood") || label.includes("dashi")) score += 2;
+    if (label.includes("herb")) score += 1;
+    if (label.includes("mushroom")) score += 2;
+    if (label.includes("aromatic")) score += 1;
+    if (label.includes("smoky") || label.includes("woody")) score += 1;
+    if (label.includes("bitter")) score += 1;
+    if (label.includes("vinegar") || label.includes("pickle")) score += 1;
+    if (label.includes("tropical")) score += 1;
+    if (label.includes("root")) score += 1;
+    if (label.includes("fruit") && !label.includes("dried")) score += 1;
+    if (label.includes("dessert") || label.includes("sweet") || label.includes("baking")) score -= 2;
+    if (label.includes("deli") || label.includes("sandwich")) score -= 1;
+    if (label.includes("supper") || label.includes("comfort")) score -= 1;
+    if (mode.n >= 30 && mode.n <= 120) score += 2;
+    else if (mode.n > 200) score -= 1;
+    return score;
+  }
+
+  // Maps ingredient combos to concrete dish descriptions for mode cards.
+  // Each pattern: { needs: [ingredients where ANY match], boost: [extra match weight], title, dishes }
+  const DISH_PATTERNS = [
+    // East Asian
+    { needs: ["bonito_flakes", "bonito_flake", "dashi"], title: "Dashi broth & umami seafood", dishes: "Miso soup, udon in broth, grilled scallops, chawanmushi" },
+    { needs: ["sichuan_peppercorn"], boost: ["chili_oil", "black_bean_paste", "doubanjiang"], title: "Sichuan numbing-spicy dishes", dishes: "Mapo tofu, dan dan noodles, wontons in chili oil" },
+    { needs: ["shiitake_mushroom", "enoki_mushroom", "crab_mushroom"], boost: ["oyster_sauce", "light_soy_sauce"], title: "Mushroom stir-fry & hot pot", dishes: "Mushroom hot pot, soy-braised tofu, lo mein, stir-fried greens" },
+    { needs: ["light_soy_sauce", "soy_sauce"], boost: ["napa_cabbage", "soybean_sprout"], title: "Soy-braised vegetables & noodles", dishes: "Stir-fried greens, braised napa cabbage, soy noodle soup" },
+    { needs: ["wood_ear_mushroom", "garland_chrysanthemum"], title: "Chinese herbal stir-fries", dishes: "Wood ear salad, tangerine peel chicken, chrysanthemum greens" },
+
+    // South Asian
+    { needs: ["asafoetida", "curry_leaf"], title: "South Indian tempering & spice", dishes: "Tadka dal, sambar, dosa with chutney, rasam" },
+    { needs: ["cardamom", "clove"], boost: ["cumin", "bay_leaf", "coriander"], title: "Whole-spice Indian cooking", dishes: "Biryani, chai, garam masala curries, korma" },
+    { needs: ["cumin", "coriander"], boost: ["fennel_seed", "turmeric", "garlic"], title: "Aromatic curries & spiced dal", dishes: "Chana masala, dal fry, aloo gobi, spiced lentil soup" },
+    { needs: ["kashmiri_chili", "nigella_seed"], title: "Kashmiri & Bengali spice", dishes: "Rogan josh, paneer tikka, Bengali fish curry" },
+
+    // Mediterranean
+    { needs: ["oregano", "thyme", "parsley"], boost: ["olive_oil"], title: "Herb-roasted Mediterranean", dishes: "Roasted chicken with herbs, Greek salad, grilled lamb, herb-crusted fish" },
+    { needs: ["balsamic_vinegar"], boost: ["olive_oil"], title: "Balsamic & olive oil dishes", dishes: "Caprese salad, balsamic roasted vegetables, bruschetta" },
+    { needs: ["olive_oil", "cayenne_pepper"], boost: ["white_wine_vinegar", "red_wine_vinegar"], title: "Peppery vinaigrettes & marinades", dishes: "Olive oil dressings, roasted pepper antipasti, marinated vegetables" },
+    { needs: ["fontina_cheese", "manchego_cheese", "asiago_cheese"], title: "Melting cheese boards", dishes: "Fondue, grilled cheese, cheese plates, queso fundido" },
+    { needs: ["muenster_cheese", "monterey_jack_cheese"], title: "Melty comfort cheese", dishes: "Quesadillas, mac and cheese, grilled cheese sandwiches" },
+    { needs: ["portobello_mushroom"], boost: ["asiago_cheese", "fontina_cheese"], title: "Mushroom & cheese melts", dishes: "Stuffed portobello, mushroom risotto, savory galettes" },
+    { needs: ["marjoram", "oregano"], boost: ["thyme", "parsley"], title: "Mediterranean herb blends", dishes: "Herbes de Provence, tabbouleh, herb-grilled fish, za'atar bread" },
+
+    // Latin / Mexican
+    { needs: ["tomatillo", "poblano_pepper"], title: "Mexican green salsas & chiles", dishes: "Salsa verde, chile rellenos, enchiladas verdes, chilaquiles" },
+    { needs: ["ancho_chile", "guajillo_chile"], title: "Mexican dried chile sauces", dishes: "Mole, birria, enchilada sauce, chile colorado" },
+    { needs: ["anaheim_chile", "new_mexico_chile"], title: "New World roasted chiles", dishes: "Green chile stew, chile colorado, red enchilada sauce" },
+    { needs: ["chipotle_pepper"], boost: ["tomatillo"], title: "Smoky chipotle dishes", dishes: "Chipotle tacos, adobo marinade, smoky black bean soup" },
+
+    // Southeast Asian
+    { needs: ["tsao_ko", "sand_ginger"], title: "Southeast Asian aromatic broths", dishes: "Pho, tom yum, Sichuan hot pot, laksa" },
+    { needs: ["birds_eye_chili", "ginger"], boost: ["razor_clam", "oyster_sauce"], title: "Spicy ginger seafood & stir-fry", dishes: "Ginger scallion fish, chili crab, salt and pepper shrimp" },
+
+    // Chinese herbal
+    { needs: ["red_date", "longan"], boost: ["chinese_yam", "angelica_root"], title: "Chinese herbal tonics & soups", dishes: "Red date tea, herbal chicken soup, sweet tong sui" },
+
+    // General
+    { needs: ["paprika"], boost: ["cayenne_pepper", "black_pepper"], title: "Paprika-spiced comfort food", dishes: "Goulash, paprikash, Cajun-spiced chicken, spice rubs" },
+    { needs: ["bay_leaf", "thyme"], boost: ["cumin", "black_pepper"], title: "Warm spice stews & braises", dishes: "Beef stew, braised short ribs, pot roast, French onion soup" },
+  ];
+
+  function matchDishPattern(mode) {
+    const members = new Set(mode.members.slice(0, 30));
+    let best = null;
+    let bestScore = 0;
+
+    for (const pat of DISH_PATTERNS) {
+      const mainHits = pat.needs.filter((i) => members.has(i)).length;
+      if (mainHits === 0) continue;
+      let score = mainHits * 3;
+      if (pat.boost) score += pat.boost.filter((i) => members.has(i)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        best = pat;
+      }
+    }
+    return best;
+  }
+
+  function makeModeCard(mode) {
+    const cuisineTag = extractCuisineFromLabel(mode.label);
+    const dishMatch = matchDishPattern(mode);
+
+    // Dish-forward title
+    let title;
+    if (dishMatch) {
+      title = dishMatch.title;
+    } else {
+      title = mode.label;
+      if (cuisineTag) title = title.replace(new RegExp("^" + escapeRegex(cuisineTag) + "\\s*", "i"), "");
+      title = title.replace(/\s+and\s+/g, " & ");
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+    }
+
+    // Concrete dish examples as description
+    let desc;
+    if (dishMatch && dishMatch.dishes) {
+      desc = "Think: " + dishMatch.dishes;
+    } else if (cuisineTag) {
+      desc = cuisineTag + " flavors";
+    } else {
+      desc = mode.property.replace("cf_", "").replace("fg_", "").replace(/_/g, " ");
+    }
+
+    // Only use the top members (most representative of this mode's theme).
+    // Members are ordered by association strength, so tail items are noise.
+    const topMembers = mode.members.slice(0, 20);
+    const samples = topMembers
+      .filter((i) => !SKIP_SET.has(i))
+      .slice(0, 5)
+      .map((i) => ({ name: displayName(i), emoji: ingredientEmoji(i) }));
+
+    return {
+      id: "m:" + mode.id,
+      type: "mode",
+      modeId: mode.id,
+      label: title,
+      emoji: modeEmoji(mode),
+      desc,
+      context: cuisineTag,
+      samples,
+      options: [
+        { label: "Love", value: 3, cls: "positive" },
+        { label: "Hate", value: -2, cls: "negative" },
+        { label: "Skip", value: "unknown", cls: "unknown" },
+      ],
+    };
+  }
+
+  function modeEmoji(mode) {
+    const l = mode.label.toLowerCase();
+    if (l.includes("ferment") || l.includes("umami")) return "\u{1F9EB}";
+    if (l.includes("seafood") || l.includes("fish") || l.includes("dashi")) return "\u{1F41F}";
+    if (l.includes("cheese") || l.includes("dairy")) return "\u{1F9C0}";
+    if (l.includes("spice") || l.includes("chile") || l.includes("pepper")) return "\u{1F336}\uFE0F";
+    if (l.includes("herb") || l.includes("aromatic")) return "\u{1F33F}";
+    if (l.includes("mushroom")) return "\u{1F344}";
+    if (l.includes("fruit") || l.includes("tropical")) return "\u{1F34A}";
+    if (l.includes("vegetable") || l.includes("root")) return "\u{1F96C}";
+    if (l.includes("grain") || l.includes("bread") || l.includes("noodle")) return "\u{1F35C}";
+    if (l.includes("smoky") || l.includes("woody")) return "\u{1F525}";
+    if (l.includes("bitter")) return "\u{1F375}";
+    if (l.includes("vinegar") || l.includes("sour") || l.includes("tart")) return "\u{1F34B}";
+    if (l.includes("sweet")) return "\u{1F36F}";
+    return "\u{1F37D}\uFE0F";
+  }
+
+  function extractCuisineFromLabel(label) {
+    const match = label.match(/^(East[- ]?Asian|South[- ]?Asian|Southeast[- ]?Asian|Mediterranean|Latin[- ]?American|Mexican|Chinese|Japanese|Korean|Pan-Asian|Western|European|Tex-Mex|Cajun|Indonesian|Indian)/i);
+    return match ? match[1] : null;
+  }
+
+  function selectProbesFromMode(modeId, count, quiz, reason) {
+    const mode = epicure.modeById[modeId];
+    if (!mode) return [];
+
+    const already = new Set(quiz.queue.map((c) => c.id));
+    Object.keys(quiz.responses).forEach((k) => already.add(k));
+
+    // Only consider top 30 members — deeper members barely belong to this mode
+    const candidates = mode.members
+      .slice(0, 30)
+      .map((ing, idx) => ({ ing, rank: idx }))
+      .filter((c) => !already.has("i:" + c.ing))
+      .filter((c) => isIngredientAllowed(c.ing, quiz.restrictions))
+      .filter((c) => !SKIP_SET.has(c.ing));
+
+    const scored = candidates.map((c) => {
+      let score = 0;
+      if (FEAT[c.ing]) score += 5;
+      score += ingredientControversy(c.ing);
+      // Strongly prefer ingredients near the top of the member list (most representative)
+      score += Math.max(0, 10 - c.rank);
+      return { ing: c.ing, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    const contextLabel = reason || mode.label;
+    return scored.slice(0, count).map((s) => makeIngredientCard(s.ing, contextLabel));
+  }
+
+  function selectBoundaryIngredients(quiz) {
+    const already = new Set(quiz.queue.map((c) => c.id));
+    Object.keys(quiz.responses).forEach((k) => already.add(k));
+
+    // Find ingredients from modes adjacent to liked AND disliked modes
+    const likedModeIds = new Set();
+    const dislikedModeIds = new Set();
+    Object.entries(quiz.responses).forEach(([id, value]) => {
+      if (id.startsWith("m:")) {
+        if (value > 0) likedModeIds.add(id.slice(2));
+        if (value < 0) dislikedModeIds.add(id.slice(2));
+      }
+    });
+
+    // Ingredients liked in probes
+    const likedIngredients = new Set();
+    Object.entries(quiz.responses).forEach(([id, value]) => {
+      if (id.startsWith("i:") && value > 0) likedIngredients.add(id.slice(2));
+    });
+
+    // Find high-signal ingredients we haven't asked about yet
+    const candidates = [];
+    for (const ing of Object.keys(FEAT)) {
+      if (already.has("i:" + ing)) continue;
+      if (!epicure.ingredients.has(ing)) continue;
+      if (!isIngredientAllowed(ing, quiz.restrictions)) continue;
+      if (SKIP_SET.has(ing)) continue;
+
+      const controversy = ingredientControversy(ing);
+      if (controversy < 4) continue;
+
+      candidates.push({ ing, score: controversy });
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    // Keep boundary round short — the quiz should wrap up soon
+    const boundaryCount = Math.min(3, Math.max(0, QUIZ_TARGET - quiz.pos - 1));
+    return candidates.slice(0, boundaryCount).map((c) => makeIngredientCard(c.ing, "Wild card"));
+  }
+
+  function makeIngredientCard(ingredient, context) {
+    return {
+      id: "i:" + ingredient,
+      type: "ingredient",
+      label: displayName(ingredient),
+      emoji: ingredientEmoji(ingredient),
+      desc: ingredientDesc(ingredient),
+      context: context || null,
+      options: [
+        { label: "Love", value: 3, cls: "positive" },
+        { label: "Hate", value: -2, cls: "negative" },
+        { label: "Skip", value: "unknown", cls: "unknown" },
+      ],
+    };
+  }
+
+  // ─── PROFILE ───────────────────────────────────────────────────
+
+  function buildProfile(quiz) {
+    const id = "fm_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
+    return {
+      v: VERSION,
+      id,
+      name: quiz.name,
+      t: new Date().toISOString(),
+      restrictions: quiz.restrictions,
+      responses: { ...quiz.responses },
+    };
+  }
+
+  function cuisineAffinities(profile) {
+    const affinities = {};
+    CUISINES.forEach((c) => {
+      const resp = profile.responses["c:" + c.id];
+      affinities[c.id] = typeof resp === "number" ? resp : 0;
+    });
+    return affinities;
+  }
+
+  function adventureScore(profile) {
+    let total = 0;
+    let accepted = 0;
+    Object.entries(profile.responses).forEach(([id, value]) => {
+      if (id.startsWith("i:")) {
+        const ing = id.slice(2);
+        const c = ingredientControversy(ing);
+        if (c >= 3) {
+          total += c;
+          if (typeof value === "number" && value > 0) accepted += c;
+        }
+      }
+    });
+    return total > 0 ? Math.round((accepted / total) * 100) : 50;
+  }
+
+  function tasteSignature(profile) {
+    const sig = { umami: 0, fresh: 0, rich: 0, spicy: 0, sweet: 0, earthy: 0, funky: 0, herbal: 0 };
+    const propertyMap = {
+      umami_score: "umami", cf_meaty: "umami", cf_earthy: "earthy",
+      cf_balsamic: "funky", cf_citrus: "fresh", cf_minty: "herbal",
+      cf_woody: "earthy", cf_savory: "rich", cf_sweet: "sweet",
+      pungent_score: "spicy", sweet_score: "sweet", sour_score: "fresh",
+      bitter_score: "herbal", fatty_score: "rich",
+      fg_Spice: "spicy", fg_Dairy: "rich", fg_Vegetable: "fresh", fg_Fruit: "sweet",
+    };
+
+    Object.entries(profile.responses).forEach(([id, value]) => {
+      if (id.startsWith("m:") && typeof value === "number" && value > 0) {
+        const modeId = id.slice(2);
+        const mode = epicure ? epicure.modeById[modeId] : null;
+        if (mode) {
+          const dim = propertyMap[mode.property];
+          if (dim) sig[dim] += value;
+        }
+      }
+      if (id.startsWith("i:") && typeof value === "number" && value > 0) {
+        const ing = id.slice(2);
+        const modes = epicure ? epicure.ingredientModes[ing] || [] : [];
+        modes.slice(0, 3).forEach((modeId) => {
+          const mode = epicure ? epicure.modeById[modeId] : null;
+          if (mode) {
+            const dim = propertyMap[mode.property];
+            if (dim) sig[dim] += value * 0.3;
+          }
+        });
+      }
+    });
+
+    // Normalize to 0-10
+    const max = Math.max(1, ...Object.values(sig));
+    Object.keys(sig).forEach((k) => { sig[k] = Math.round((sig[k] / max) * 10); });
+    return sig;
+  }
+
+  function topResponses(profile, filter) {
+    return Object.entries(profile.responses)
+      .filter(([id, value]) => filter(id, value))
+      .map(([id]) => {
+        if (id.startsWith("i:")) {
+          const ing = id.slice(2);
+          return { id, label: displayName(ing), emoji: ingredientEmoji(ing) };
+        }
+        if (id.startsWith("m:")) {
+          const mode = epicure ? epicure.modeById[id.slice(2)] : null;
+          return { id, label: mode ? mode.label : id.slice(2), emoji: mode ? modeEmoji(mode) : "\u{1F37D}\uFE0F" };
+        }
+        if (id.startsWith("c:")) {
+          const c = CUISINES.find((x) => "c:" + x.id === id);
+          return { id, label: c ? c.label : id, emoji: c ? c.emoji : "\u{1F37D}\uFE0F" };
+        }
+        return { id, label: id, emoji: "\u{1F37D}\uFE0F" };
+      });
+  }
+
+  // ─── RESTAURANTS & DISHES ──────────────────────────────────────
+
+  const RESTAURANTS = [
+    { name: "Sushi bar", emoji: "\u{1F363}", cuisines: ["Japanese"], keys: ["salmon", "tuna", "nori", "wasabi", "sea_urchin", "eel", "octopus", "shrimp"] },
+    { name: "Ramen shop", emoji: "\u{1F35C}", cuisines: ["Japanese"], keys: ["miso", "bonito_flake", "dashi", "sesame_oil", "chili_oil", "enoki_mushroom"] },
+    { name: "Izakaya", emoji: "\u{1F3EE}", cuisines: ["Japanese"], keys: ["miso", "sesame_oil", "ginger", "tofu", "enoki_mushroom", "squid", "octopus", "dashi"] },
+    { name: "Korean BBQ", emoji: "\u{1F969}", cuisines: ["East_Asian"], keys: ["gochujang", "kimchi", "sesame_oil", "garlic", "ginger"] },
+    { name: "Dim sum parlor", emoji: "\u{1F95F}", cuisines: ["East_Asian"], keys: ["shrimp", "soy_sauce", "ginger", "sesame_oil", "chili_oil"] },
+    { name: "Sichuan restaurant", emoji: "\u{1F336}\uFE0F", cuisines: ["East_Asian"], keys: ["sichuan_peppercorn", "chili_oil", "fermented_black_bean", "garlic", "tofu"] },
+    { name: "Chinese noodle house", emoji: "\u{1F962}", cuisines: ["East_Asian"], keys: ["soy_sauce", "sesame_oil", "ginger", "garlic", "shiitake_mushroom", "chili_oil"] },
+    { name: "Thai restaurant", emoji: "\u{1F35B}", cuisines: ["Southeast_Asian"], keys: ["fish_sauce", "lemongrass", "galangal", "coconut_milk", "birds_eye_chili", "tamarind"] },
+    { name: "Vietnamese pho spot", emoji: "\u{1F35C}", cuisines: ["Southeast_Asian"], keys: ["fish_sauce", "ginger", "star_anise", "coriander", "sriracha"] },
+    { name: "Indian curry house", emoji: "\u{1F35B}", cuisines: ["South_Asian"], keys: ["cumin", "turmeric", "cardamom", "coriander", "ghee", "ginger", "garlic"] },
+    { name: "South Indian dosa place", emoji: "\u{1FAD3}", cuisines: ["South_Asian"], keys: ["asafoetida", "curry_leaf", "coconut_milk", "tamarind", "fenugreek_seed"] },
+    { name: "Italian trattoria", emoji: "\u{1F35D}", cuisines: ["Mediterranean"], keys: ["olive", "parmesan", "prosciutto", "arugula", "artichoke", "caper", "brie"] },
+    { name: "Greek taverna", emoji: "\u{1FAD2}", cuisines: ["Mediterranean"], keys: ["olive", "feta", "tahini", "sumac", "labneh", "eggplant"] },
+    { name: "Tapas bar", emoji: "\u{1F377}", cuisines: ["Mediterranean"], keys: ["olive", "caper", "anchovy", "coriander", "fennel", "prosciutto"] },
+    { name: "Middle Eastern grill", emoji: "\u{1F9C6}", cuisines: ["Mediterranean"], keys: ["tahini", "sumac", "za_atar", "pomegranate_molasses", "labneh", "harissa"] },
+    { name: "Mexican taqueria", emoji: "\u{1F32E}", cuisines: ["Latin_American"], keys: ["chipotle_pepper", "avocado", "coriander", "habanero_pepper"] },
+    { name: "Oaxacan mole spot", emoji: "\u{1FAD5}", cuisines: ["Latin_American"], keys: ["chipotle_pepper", "coriander", "avocado"] },
+    { name: "French bistro", emoji: "\u{1F950}", cuisines: ["Western_Atlantic", "Mediterranean"], keys: ["brie", "camembert", "gruyere", "duck", "foie_gras", "prosciutto", "fennel"] },
+    { name: "Steakhouse", emoji: "\u{1F969}", cuisines: ["Western_Atlantic"], keys: ["bacon", "blue_cheese", "horseradish", "bone_marrow"] },
+    { name: "Gastropub", emoji: "\u{1F37A}", cuisines: ["Western_Atlantic"], keys: ["bacon", "blue_cheese", "brussels_sprout", "duck", "bone_marrow"] },
+    { name: "Seafood restaurant", emoji: "\u{1F99E}", cuisines: ["Western_Atlantic", "Japanese"], keys: ["lobster", "crab", "shrimp", "oyster", "salmon", "tuna", "squid"] },
+    { name: "Wine & cheese bar", emoji: "\u{1F377}", cuisines: ["Mediterranean", "Western_Atlantic"], keys: ["blue_cheese", "brie", "gruyere", "camembert", "prosciutto", "olive", "fig"] },
+    { name: "Vegetarian cafe", emoji: "\u{1F96C}", cuisines: [], keys: ["tofu", "tempeh", "avocado", "nutritional_yeast", "eggplant", "artichoke", "fennel", "beet"] },
+    { name: "Dumpling house", emoji: "\u{1F95F}", cuisines: ["East_Asian"], keys: ["ginger", "soy_sauce", "chili_oil", "sesame_oil", "shrimp"] },
+  ];
+
+  // Dish suggestions keyed by 1-3 ingredient triggers
+  const DISH_BANK = [
+    // Japanese
+    { dish: "Miso ramen", triggers: ["miso", "sesame_oil"], cuisine: "Japanese" },
+    { dish: "Sashimi platter", triggers: ["salmon", "tuna"], cuisine: "Japanese" },
+    { dish: "Tempura udon", triggers: ["dashi", "shrimp"], cuisine: "Japanese" },
+    { dish: "Takoyaki", triggers: ["octopus", "bonito_flake"], cuisine: "Japanese" },
+    { dish: "Unagi don", triggers: ["eel", "mirin"], cuisine: "Japanese" },
+    { dish: "Natto rice bowl", triggers: ["natto"], cuisine: "Japanese" },
+    { dish: "Miso soup", triggers: ["miso", "tofu"], cuisine: "Japanese" },
+    // East Asian
+    { dish: "Mapo tofu", triggers: ["sichuan_peppercorn", "tofu"], cuisine: "East_Asian" },
+    { dish: "Kung pao chicken", triggers: ["sichuan_peppercorn", "chili_oil"], cuisine: "East_Asian" },
+    { dish: "Dan dan noodles", triggers: ["sichuan_peppercorn", "sesame_oil"], cuisine: "East_Asian" },
+    { dish: "Wontons in chili oil", triggers: ["chili_oil", "soy_sauce"], cuisine: "East_Asian" },
+    { dish: "Kimchi jjigae", triggers: ["kimchi", "gochujang"], cuisine: "East_Asian" },
+    { dish: "Korean fried chicken", triggers: ["gochujang", "garlic"], cuisine: "East_Asian" },
+    { dish: "Mushroom stir-fry", triggers: ["shiitake_mushroom", "soy_sauce"], cuisine: "East_Asian" },
+    { dish: "Black bean noodles", triggers: ["fermented_black_bean", "soy_sauce"], cuisine: "East_Asian" },
+    { dish: "Century egg congee", triggers: ["century_egg", "ginger"], cuisine: "East_Asian" },
+    { dish: "Xiao long bao", triggers: ["ginger", "soy_sauce", "shrimp"], cuisine: "East_Asian" },
+    // Southeast Asian
+    { dish: "Pad thai", triggers: ["fish_sauce", "tamarind"], cuisine: "Southeast_Asian" },
+    { dish: "Green curry", triggers: ["coconut_milk", "galangal"], cuisine: "Southeast_Asian" },
+    { dish: "Tom yum soup", triggers: ["lemongrass", "galangal", "shrimp"], cuisine: "Southeast_Asian" },
+    { dish: "Pho", triggers: ["fish_sauce", "star_anise", "ginger"], cuisine: "Southeast_Asian" },
+    { dish: "Laksa", triggers: ["coconut_milk", "shrimp_paste", "lemongrass"], cuisine: "Southeast_Asian" },
+    { dish: "Papaya salad", triggers: ["fish_sauce", "birds_eye_chili"], cuisine: "Southeast_Asian" },
+    // South Asian
+    { dish: "Butter chicken", triggers: ["cardamom", "ghee"], cuisine: "South_Asian" },
+    { dish: "Chana masala", triggers: ["cumin", "coriander", "turmeric"], cuisine: "South_Asian" },
+    { dish: "Biryani", triggers: ["cardamom", "saffron", "cumin"], cuisine: "South_Asian" },
+    { dish: "Dal tadka", triggers: ["cumin", "asafoetida"], cuisine: "South_Asian" },
+    { dish: "Dosa with sambar", triggers: ["curry_leaf", "asafoetida", "tamarind"], cuisine: "South_Asian" },
+    { dish: "Saag paneer", triggers: ["cumin", "ghee", "ginger"], cuisine: "South_Asian" },
+    { dish: "Tandoori chicken", triggers: ["cumin", "turmeric", "ginger"], cuisine: "South_Asian" },
+    // Mediterranean
+    { dish: "Greek salad", triggers: ["olive", "feta"], cuisine: "Mediterranean" },
+    { dish: "Bruschetta", triggers: ["olive", "arugula"], cuisine: "Mediterranean" },
+    { dish: "Shakshuka", triggers: ["harissa", "feta"], cuisine: "Mediterranean" },
+    { dish: "Hummus with za'atar", triggers: ["tahini", "za_atar"], cuisine: "Mediterranean" },
+    { dish: "Grilled halloumi", triggers: ["olive", "sumac"], cuisine: "Mediterranean" },
+    { dish: "Labneh with olive oil", triggers: ["labneh", "olive"], cuisine: "Mediterranean" },
+    { dish: "Caponata", triggers: ["eggplant", "caper", "olive"], cuisine: "Mediterranean" },
+    { dish: "Beet & goat cheese salad", triggers: ["beet", "goat_cheese"], cuisine: "Mediterranean" },
+    { dish: "Cacio e pepe", triggers: ["parmesan"], cuisine: "Mediterranean" },
+    { dish: "Caprese salad", triggers: ["olive"], cuisine: "Mediterranean" },
+    // Latin American
+    { dish: "Tacos al pastor", triggers: ["chipotle_pepper", "avocado"], cuisine: "Latin_American" },
+    { dish: "Ceviche", triggers: ["shrimp", "avocado", "coriander"], cuisine: "Latin_American" },
+    { dish: "Mole negro", triggers: ["chipotle_pepper", "coriander"], cuisine: "Latin_American" },
+    { dish: "Elote", triggers: ["chipotle_pepper", "coriander"], cuisine: "Latin_American" },
+    { dish: "Guacamole", triggers: ["avocado", "coriander"], cuisine: "Latin_American" },
+    // Western
+    { dish: "Steak with bone marrow", triggers: ["bone_marrow", "bacon"], cuisine: "Western_Atlantic" },
+    { dish: "Duck confit", triggers: ["duck"], cuisine: "Western_Atlantic" },
+    { dish: "Foie gras torchon", triggers: ["foie_gras"], cuisine: "Western_Atlantic" },
+    { dish: "Roasted brussels sprouts", triggers: ["brussels_sprout", "bacon"], cuisine: "Western_Atlantic" },
+    { dish: "Cheese board", triggers: ["brie", "blue_cheese", "gruyere", "fig"], cuisine: "Western_Atlantic" },
+    { dish: "French onion soup", triggers: ["gruyere"], cuisine: "Western_Atlantic" },
+    { dish: "Lobster roll", triggers: ["lobster"], cuisine: "Western_Atlantic" },
+    { dish: "Oysters on the half shell", triggers: ["oyster"], cuisine: "Western_Atlantic" },
+  ];
+
+  function profileLikedIngredients(profile) {
+    const liked = new Set();
+    Object.entries(profile.responses).forEach(([id, v]) => {
+      if (id.startsWith("i:") && typeof v === "number" && v > 0) liked.add(id.slice(2));
+    });
+    return liked;
+  }
+
+  function profileDislikedIngredients(profile) {
+    const disliked = new Set();
+    Object.entries(profile.responses).forEach(([id, v]) => {
+      if (id.startsWith("i:") && typeof v === "number" && v < 0) disliked.add(id.slice(2));
+    });
+    return disliked;
+  }
+
+  function suggestRestaurants(profile) {
+    const liked = profileLikedIngredients(profile);
+    const disliked = profileDislikedIngredients(profile);
+    const affinities = cuisineAffinities(profile);
+
+    return RESTAURANTS.map((r) => {
+      let score = 0;
+      // Cuisine affinity
+      r.cuisines.forEach((c) => { score += Math.max(0, affinities[c] || 0) * 2; });
+      if (r.cuisines.length === 0) score += 1; // neutral restaurants get a small base
+      // Ingredient matches
+      const hits = r.keys.filter((k) => liked.has(k));
+      const misses = r.keys.filter((k) => disliked.has(k));
+      score += hits.length * 3;
+      score -= misses.length * 4;
+      return { ...r, score, hits: hits.length, misses: misses.length };
+    })
+    .filter((r) => r.score > 0 && r.hits >= 1)
+    .sort((a, b) => b.score - a.score);
+  }
+
+  function suggestDishes(profile) {
+    const liked = profileLikedIngredients(profile);
+    const disliked = profileDislikedIngredients(profile);
+    const affinities = cuisineAffinities(profile);
+
+    return DISH_BANK.map((d) => {
+      const hits = d.triggers.filter((t) => liked.has(t));
+      const misses = d.triggers.filter((t) => disliked.has(t));
+      if (misses.length > 0 || hits.length === 0) return null;
+      let score = hits.length * 3;
+      score += Math.max(0, affinities[d.cuisine] || 0);
+      return { ...d, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+  }
+
+  function suggestSharedRestaurants(a, b) {
+    const aRecs = suggestRestaurants(a);
+    const bRecs = suggestRestaurants(b);
+    const bMap = {};
+    bRecs.forEach((r) => { bMap[r.name] = r; });
+
+    return aRecs
+      .filter((r) => bMap[r.name])
+      .map((r) => ({ ...r, score: r.score + bMap[r.name].score }))
+      .sort((x, y) => y.score - x.score);
+  }
+
+  function suggestSharedDishes(a, b) {
+    const aLiked = profileLikedIngredients(a);
+    const bLiked = profileLikedIngredients(b);
+    const aDisliked = profileDislikedIngredients(a);
+    const bDisliked = profileDislikedIngredients(b);
+
+    return DISH_BANK.map((d) => {
+      const aHits = d.triggers.filter((t) => aLiked.has(t));
+      const bHits = d.triggers.filter((t) => bLiked.has(t));
+      const anyMiss = d.triggers.some((t) => aDisliked.has(t) || bDisliked.has(t));
+      if (anyMiss || aHits.length === 0 || bHits.length === 0) return null;
+      return { ...d, score: aHits.length + bHits.length };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+  }
+
+  function suggestAvoidDishes(a, b) {
+    const aLiked = profileLikedIngredients(a);
+    const bLiked = profileLikedIngredients(b);
+    const aDisliked = profileDislikedIngredients(a);
+    const bDisliked = profileDislikedIngredients(b);
+
+    return DISH_BANK.map((d) => {
+      // One person likes the dish triggers, the other dislikes them
+      const aWants = d.triggers.filter((t) => aLiked.has(t)).length;
+      const bWants = d.triggers.filter((t) => bLiked.has(t)).length;
+      const aHates = d.triggers.filter((t) => aDisliked.has(t)).length;
+      const bHates = d.triggers.filter((t) => bDisliked.has(t)).length;
+      if ((aWants > 0 && bHates > 0) || (bWants > 0 && aHates > 0)) {
+        const who = aHates > 0 ? "a" : "b";
+        return { ...d, who };
+      }
+      return null;
+    })
+    .filter(Boolean);
+  }
+
+  // ─── COMPARISON ────────────────────────────────────────────────
+
+  function compareProfiles(a, b) {
+    const sharedLikes = [];
+    const conflicts = [];
+    const aLikes = new Set();
+    const bLikes = new Set();
+
+    Object.entries(a.responses).forEach(([id, v]) => { if (typeof v === "number" && v > 0) aLikes.add(id); });
+    Object.entries(b.responses).forEach(([id, v]) => { if (typeof v === "number" && v > 0) bLikes.add(id); });
+
+    for (const id of aLikes) {
+      if (bLikes.has(id)) sharedLikes.push(id);
+      const bv = b.responses[id];
+      if (typeof bv === "number" && bv < 0) conflicts.push({ id, who: "a" });
+    }
+    for (const id of bLikes) {
+      const av = a.responses[id];
+      if (typeof av === "number" && av < 0) conflicts.push({ id, who: "b" });
+    }
+
+    // Bridge: things one likes that the other hasn't tried
+    const bridges = [];
+    for (const id of aLikes) {
+      if (b.responses[id] === undefined || b.responses[id] === "unknown") bridges.push({ id, from: "a" });
+    }
+    for (const id of bLikes) {
+      if (a.responses[id] === undefined || a.responses[id] === "unknown") bridges.push({ id, from: "b" });
+    }
+
+    // Score
+    const totalAnswered = new Set([...Object.keys(a.responses), ...Object.keys(b.responses)]).size;
+    const overlapBonus = sharedLikes.length * 4;
+    const nicheBonus = sharedLikes.filter((id) => id.startsWith("i:") && ingredientControversy(id.slice(2)) >= 4).length * 3;
+    const conflictPenalty = conflicts.length * 5;
+    const baseScore = totalAnswered > 0 ? Math.round((sharedLikes.length / Math.max(1, Math.min(aLikes.size, bLikes.size))) * 50) : 50;
+    const score = Math.max(0, Math.min(100, baseScore + overlapBonus + nicheBonus - conflictPenalty));
+
+    return {
+      score,
+      sharedLikes: sharedLikes.map(responseInfo),
+      conflicts: conflicts.map((c) => ({ ...responseInfo(c.id), who: c.who })),
+      bridges: bridges.slice(0, 8).map((b) => ({ ...responseInfo(b.id), from: b.from })),
+    };
+  }
+
+  function responseInfo(id) {
+    if (id.startsWith("i:")) {
+      const ing = id.slice(2);
+      return { id, label: displayName(ing), emoji: ingredientEmoji(ing), type: "ingredient" };
+    }
+    if (id.startsWith("m:")) {
+      const mode = epicure ? epicure.modeById[id.slice(2)] : null;
+      return { id, label: mode ? mode.label : id, emoji: mode ? modeEmoji(mode) : "\u{1F37D}\uFE0F", type: "mode" };
+    }
+    if (id.startsWith("c:")) {
+      const c = CUISINES.find((x) => "c:" + x.id === id);
+      return { id, label: c ? c.label : id, emoji: c ? c.emoji : "\u{1F37D}\uFE0F", type: "cuisine" };
+    }
+    return { id, label: id, emoji: "\u{1F37D}\uFE0F", type: "unknown" };
+  }
+
+  // ─── DAYLIST ───────────────────────────────────────────────────
+
+  function generateDaylist(profile) {
+    const seed = profile.id || "default";
+    const adv = adventureScore(profile);
+    const advTier = adv > 65 ? "high" : adv > 35 ? "mid" : "low";
+    const advWord = seededPick(VIBE.adventure[advTier], seed + "adv");
+
+    const taste = tasteSignature(profile);
+    const sortedDims = Object.entries(taste).sort((a, b) => b[1] - a[1]);
+    const topDim = sortedDims[0] ? sortedDims[0][0] : "umami";
+    const flavorWord = seededPick(VIBE.flavor[topDim] || VIBE.flavor.umami, seed + "flav");
+
+    const affinities = cuisineAffinities(profile);
+    const topCuisine = Object.entries(affinities).sort((a, b) => b[1] - a[1])[0];
+    const cultureWord = topCuisine && topCuisine[1] > 0
+      ? seededPick(VIBE.culture[topCuisine[0]] || ["wandering"], seed + "cult")
+      : "wandering";
+
+    const hour = new Date().getHours();
+    const timePeriod = hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
+    const timeWord = seededPick(VIBE.time[timePeriod], seed + "time");
+
+    return `${advWord} ${flavorWord} ${cultureWord} ${timeWord}`;
+  }
+
+  function hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash;
+  }
+
+  function seededPick(arr, seed) {
+    if (!arr || !arr.length) return "";
+    return arr[Math.abs(hashCode(seed)) % arr.length];
+  }
+
+  // ─── STORAGE ───────────────────────────────────────────────────
+
+  function loadProfiles() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+    catch { return []; }
+  }
+
+  function saveProfile(profile) {
+    const profiles = loadProfiles().filter((p) => p.id !== profile.id);
+    profiles.unshift(profile);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles.slice(0, MAX_PROFILES)));
+  }
+
+  // ─── URL ENCODING ─────────────────────────────────────────────
+
+  function encodePayload(payload) {
+    const bytes = new TextEncoder().encode(JSON.stringify(payload));
+    let binary = "";
+    bytes.forEach((b) => { binary += String.fromCharCode(b); });
+    return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+  }
+
+  function decodePayload(str) {
+    const padded = str.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(str.length / 4) * 4, "=");
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+
+  function baseUrl() { return location.href.split("#")[0]; }
+  function profileUrl(profile) { return baseUrl() + "#profile=" + encodePayload(profile); }
+  function inviteUrl(profile) { return baseUrl() + "#take=" + encodePayload(profile); }
+  function compareUrl(a, b) { return baseUrl() + "#compare=" + encodePayload(a) + "." + encodePayload(b); }
+
+  // ─── RENDERING ─────────────────────────────────────────────────
+
+  function render() {
+    if (state.route === "landing") return renderLanding();
+    if (state.route === "profile") return renderResults();
+    if (state.route === "compare") return renderCompare();
+    if (state.route === "history") return renderHistory();
+    if (!state.quiz) return renderSetup();
+    if (state.quiz.phase === "done") return finishQuiz();
+    if (state.quiz.phase === "setup") return renderSetup();
+    renderQuizCard();
+  }
+
+  function renderShell(content) {
+    app.innerHTML = `
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">\u{1F37D}\uFE0F</div>
+          <div>
+            <h1>Food Match</h1>
+            <p>Adaptive tasting quiz</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="pill-button" data-action="new-quiz" data-icon="\u21BB">Retake</button>
+          <button class="pill-button" data-action="history" data-icon="\u2630">Profiles</button>
+        </div>
+      </header>
+      <section class="stage">${content}</section>
+      <footer class="source-strip">
+        Built on <a href="https://huggingface.co/Kaikaku/epicure-cooc" target="_blank" rel="noreferrer">Epicure-Cooc</a>:
+        1,790 ingredients, 150 modes, 7 cuisine poles.
+      </footer>
+      ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ""}
+    `;
+    bindGlobalActions();
+  }
+
+  function renderLanding() {
+    renderShell(`
+      <article class="setup-card" style="max-width: 620px">
+        <div class="card-emoji">\u{1F37D}\uFE0F</div>
+        <h2 class="card-title">Food Match</h2>
+        <p class="card-desc" style="max-width: 52ch">
+          Most food apps ask what you want tonight. We ask who you are as an eater.
+        </p>
+
+        <div class="section-title">The idea</div>
+        <p class="card-desc" style="text-align: left; max-width: none">
+          Everyone has a unique taste fingerprint shaped by culture, memory, and biology. Food Match maps yours through an adaptive quiz that responds to your answers in real time, digging deeper into the flavors you love and probing the ones you're unsure about.
+        </p>
+
+        <div class="section-title">Powered by Epicure-Cooc</div>
+        <p class="card-desc" style="text-align: left; max-width: none">
+          Under the hood, we use <strong>Epicure-Cooc</strong>, a dataset of 1,790 real ingredients organized into 150 flavor modes across 7 cuisine poles. Modes are clusters of ingredients that naturally appear together in recipes: think "fermented umami condiments" or "tropical citrus and coconut." This isn't guesswork. It's built from actual co-occurrence patterns in cooking.
+        </p>
+
+        <div class="section-title">How it works</div>
+        <p class="card-desc" style="text-align: left; max-width: none">
+          You'll swipe through roughly 50 cards. First, broad cuisine vibes. Then, specific flavor categories chosen based on your responses. Finally, individual ingredients at the boundaries of your taste, the polarizing foods that separate adventurous eaters from comfort-seekers. Swipe right to like, left to pass, down if you haven't tried it.
+        </p>
+
+        <div class="section-title">What you get</div>
+        <p class="card-desc" style="text-align: left; max-width: none">
+          A taste profile with your cuisine DNA, adventure score, and a Spotify Daylist-style title that captures your eating vibe. Share it with a friend and compare palates to find where you overlap, where you clash, and what to order together.
+        </p>
+
+        <div class="section-title">Design choices</div>
+        <p class="card-desc" style="text-align: left; max-width: none">
+          We skip boring ingredients. Nobody needs to be asked about salt or chicken. Instead, we focus on the foods that reveal something: natto, durian, blue cheese, sichuan peppercorn, bone marrow. The controversial stuff that splits a dinner table. We also filter for dietary restrictions so you never see foods you can't eat.
+        </p>
+
+        <button class="btn btn-primary" data-action="begin" style="margin-top: 8px">
+          Map my palate \u2192
+        </button>
+      </article>
+    `);
+
+    document.querySelector('[data-action="begin"]')?.addEventListener("click", () => {
+      state.route = "quiz";
+      state.quiz = newQuiz("", []);
+      render();
+    });
+  }
+
+  function renderSetup() {
+    const quiz = state.quiz || newQuiz("", []);
+    state.quiz = quiz;
+    quiz.phase = "setup";
+
+    const incoming = state.incomingProfile;
+    renderShell(`
+      <article class="setup-card">
+        ${incoming ? `<div class="tag" style="margin-bottom:8px">\u{1F91D} Comparing with ${esc(incoming.name || "someone")}</div>` : ""}
+        <div class="card-emoji">\u{1F37D}\uFE0F</div>
+        <h2 class="card-title">Let's map your palate</h2>
+        <p class="card-desc">An adaptive quiz powered by 1,790 real ingredients. Takes about 2 minutes.</p>
+        <label class="name-field">
+          <span>Your name</span>
+          <input id="setup-name" type="text" maxlength="40" autocomplete="name" placeholder="Optional" value="${esc(quiz.name)}">
+        </label>
+        <div class="section-title">Dietary restrictions</div>
+        <div class="restriction-grid">
+          ${RESTRICTIONS.map((r) => `
+            <button class="restriction-btn ${quiz.restrictions.includes(r.id) ? "active" : ""}"
+                    data-restriction="${r.id}">
+              ${r.emoji} ${r.label}
+            </button>
+          `).join("")}
+        </div>
+        <button class="btn btn-primary" data-action="start-quiz">
+          Start tasting \u2192
+        </button>
+      </article>
+    `);
+    bindSetupEvents();
+  }
+
+  function renderQuizCard() {
+    const quiz = state.quiz;
+    const card = currentCard(quiz);
+    if (!card) return finishQuiz();
+
+    const progress = quizProgress(quiz);
+    const phaseLabels = [
+      { id: "cuisines", label: "Cuisines" },
+      { id: "modes", label: "Flavors" },
+      { id: "ingredients", label: "Foods" },
+    ];
+
+    renderShell(`
+      <div class="progress-wrap">
+        <div class="progress-phases">
+          ${phaseLabels.map((p) => {
+            const done = phaseLabels.indexOf(p) < phaseLabels.findIndex((x) => x.id === quiz.phase);
+            const active = p.id === quiz.phase;
+            return `<span class="phase-label ${active ? "active" : ""} ${done ? "done" : ""}">${p.label}</span>`;
+          }).join('<span class="phase-dot">\u2022</span>')}
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" style="width: ${progress.pct}%"></div>
+        </div>
+        <div class="progress-meta">
+          <span>${progress.current} of ~${progress.total}</span>
+          <button class="finish-btn" data-action="finish-early">Finish early</button>
+        </div>
+      </div>
+      <div class="card-stack">
+        ${renderCardEl(card, 0)}
+        <div class="slider-wrap">
+          <div class="slider-labels">
+            <span>Hate</span>
+            <span>Nah</span>
+            <span>Meh</span>
+            <span>Good</span>
+            <span>Love</span>
+          </div>
+          <input type="range" class="taste-slider" min="0" max="4" step="1" value="2">
+          <div class="slider-ticks">
+            <span>\u{1F44E}</span>
+            <span></span>
+            <span>\u2022</span>
+            <span></span>
+            <span>\u{1F44D}</span>
+          </div>
+        </div>
+        <div class="slider-actions">
+          <button class="btn-submit" data-action="slider-submit">Next \u2192</button>
+          <button class="btn-skip" data-action="slider-skip">Haven't tried / Skip</button>
+        </div>
+      </div>
+    `);
+    bindCardEvents();
+  }
+
+  function renderCardEl(card, depth) {
+    const isCurrent = depth === 0;
+    return `
+      <article class="quiz-card" data-depth="${depth}" ${isCurrent ? 'data-interactive="true"' : ""}>
+        ${card.context ? `<div class="card-context">${esc(card.context)}</div>` : ""}
+        <div class="card-emoji">${card.emoji}</div>
+        <h2 class="card-title">${esc(card.label)}</h2>
+        <p class="card-desc">${esc(card.desc)}</p>
+        ${card.samples ? `
+          <div class="card-samples">
+            ${card.samples.map((s) => `<span class="sample-chip">${s.emoji} ${esc(s.name)}</span>`).join("")}
+          </div>
+        ` : ""}
+      </article>
+    `;
+  }
+
+  function finishQuiz() {
+    const quiz = state.quiz;
+    if (!quiz) return renderSetup();
+
+    const profile = buildProfile(quiz);
+    saveProfile(profile);
+
+    if (state.incomingProfile) {
+      state.route = "compare";
+      state.compareProfiles = [state.incomingProfile, profile];
+      state.profile = profile;
+      history.replaceState(null, "", compareUrl(state.incomingProfile, profile));
+    } else {
+      state.route = "profile";
+      state.profile = profile;
+      history.replaceState(null, "", profileUrl(profile));
+    }
     render();
   }
-}
 
-function finishQuiz() {
-  const profile = buildProfile();
-  saveProfile(profile);
-  if (state.incomingProfile) {
-    recordMetric("comparisonsCreated");
-    state.route = "compare";
-    state.compareProfiles = [state.incomingProfile, profile];
-    state.selectedProfile = profile;
-    history.replaceState(null, "", compareUrl(state.incomingProfile, profile));
-  } else {
-    state.route = "profile";
-    state.selectedProfile = profile;
-    history.replaceState(null, "", profileUrl(profile));
-  }
-  render();
-}
+  function renderResults() {
+    const profile = state.profile;
+    if (!profile) return renderSetup();
 
-function buildProfile() {
-  const id = `fm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-  return {
-    version: VERSION,
-    id,
-    name: normalizeName(state.quiz.name),
-    createdAt: new Date().toISOString(),
-    restrictions: state.quiz.restrictions,
-    responses: state.quiz.responses,
-  };
-}
+    const daylist = generateDaylist(profile);
+    const adventure = adventureScore(profile);
+    const taste = tasteSignature(profile);
+    const affinities = cuisineAffinities(profile);
+    const liked = topResponses(profile, (id, v) => typeof v === "number" && v > 0);
+    const disliked = topResponses(profile, (id, v) => typeof v === "number" && v < 0);
+    const unknown = topResponses(profile, (id, v) => v === "unknown");
+    const restaurants = suggestRestaurants(profile);
+    const dishes = suggestDishes(profile);
+    const name = profile.name || "Your";
 
-function loadProfiles() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
+    const maxTaste = Math.max(1, ...Object.values(taste));
 
-function saveProfile(profile) {
-  const profiles = loadProfiles().filter((item) => item.id !== profile.id);
-  profiles.unshift(profile);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles.slice(0, 12)));
-  recordMetric("profilesCreated");
-}
-
-function defaultMetrics() {
-  return {
-    profilesCreated: 0,
-    inviteShares: 0,
-    profileLinkShares: 0,
-    comparisonShares: 0,
-    incomingInviteOpens: 0,
-    comparisonsCreated: 0,
-    perProfileInviteShares: {},
-    seenInviteOpens: [],
-    updatedAt: null,
-  };
-}
-
-function loadMetrics() {
-  try {
-    return { ...defaultMetrics(), ...JSON.parse(localStorage.getItem(METRICS_KEY) || "{}") };
-  } catch {
-    return defaultMetrics();
-  }
-}
-
-function saveMetrics(metrics) {
-  localStorage.setItem(METRICS_KEY, JSON.stringify({ ...metrics, updatedAt: new Date().toISOString() }));
-}
-
-function recordMetric(metricName, profileId = null) {
-  const metrics = loadMetrics();
-  metrics[metricName] = (metrics[metricName] || 0) + 1;
-  if (metricName === "inviteShares" && profileId) {
-    metrics.perProfileInviteShares[profileId] = (metrics.perProfileInviteShares[profileId] || 0) + 1;
-  }
-  saveMetrics(metrics);
-}
-
-function recordInviteOpen(profile) {
-  if (!profile?.id) return;
-  const metrics = loadMetrics();
-  if (metrics.seenInviteOpens.includes(profile.id)) return;
-  metrics.seenInviteOpens.push(profile.id);
-  metrics.incomingInviteOpens = (metrics.incomingInviteOpens || 0) + 1;
-  saveMetrics(metrics);
-}
-
-function encodePayload(payload) {
-  const bytes = new TextEncoder().encode(JSON.stringify(payload));
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function decodePayload(payload) {
-  const padded = payload.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
-  const binary = atob(padded);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
-
-function baseUrl() {
-  return location.href.split("#")[0];
-}
-
-function profileUrl(profile) {
-  return `${baseUrl()}#profile=${encodePayload(profile)}`;
-}
-
-function inviteUrl(profile) {
-  return `${baseUrl()}#take=${encodePayload(profile)}`;
-}
-
-function compareUrl(a, b) {
-  return `${baseUrl()}#compare=${encodePayload(a)}.${encodePayload(b)}`;
-}
-
-function parseRoute() {
-  const hash = location.hash.slice(1);
-  if (!hash) return beginQuiz();
-
-  try {
-    if (hash.startsWith("take=")) {
-      const incomingProfile = decodePayload(hash.slice(5));
-      recordInviteOpen(incomingProfile);
-      return beginQuiz(incomingProfile);
-    }
-    if (hash.startsWith("profile=")) {
-      state.route = "profile";
-      state.selectedProfile = decodePayload(hash.slice(8));
-      state.incomingProfile = null;
-      state.compareProfiles = null;
-      return render();
-    }
-    if (hash.startsWith("compare=")) {
-      const [a, b] = hash.slice(8).split(".");
-      state.route = "compare";
-      state.compareProfiles = [decodePayload(a), decodePayload(b)];
-      state.incomingProfile = null;
-      return render();
-    }
-  } catch {
-    showToast("That link could not be opened");
-  }
-
-  beginQuiz();
-}
-
-function profileLabel(profile) {
-  const liked = likedCards(profile);
-  const priority = liked.find((card) => ["food", "controversial", "meal", "flavor", "dynamic"].includes(card.kind));
-  const icon = priority?.emoji || "🍽️";
-  return `${icon} ${profileDaylistTitle(profile)}`;
-}
-
-function profileDaylistTitle(profile) {
-  const name = normalizeName(profile.name);
-  const title = daylistCoreTitle(profile);
-  return name ? `${name}'s ${title}` : title;
-}
-
-function daylistCoreTitle(profile) {
-  const likedCardsList = likedCards(profile);
-  const likedSpecificIds = new Set(likedCardsList.filter((card) => card.kind === "food").map((card) => card.id));
-  const liked = likedCardsList
-    .filter((card) => !card.detailIds?.some((id) => likedSpecificIds.has(id)))
-    .sort((a, b) => daylistWeight(b) - daylistWeight(a));
-  const words = [];
-  for (const card of liked) {
-    const candidates = DAYLIST_WORDS[card.id] || [card.label.toLowerCase().replaceAll("+", "").replace(/\s+/g, " ").trim()];
-    for (const word of candidates) {
-      if (words.length >= 3) break;
-      if (!words.includes(word)) words.push(word);
-    }
-    if (words.length >= 3) break;
-  }
-  if (!words.length) words.push("open table");
-  if (words.length === 1) words.push("curious");
-  return `${words.join(" ")} ${dayLabel(profile.createdAt)}`;
-}
-
-function daylistWeight(card) {
-  if (card.kind === "food") return 100 + card.controversyWeight;
-  if (card.kind === "controversial") return 70 + card.controversyWeight;
-  if (card.kind === "dynamic") return 45 + card.controversyWeight;
-  return 20 + card.controversyWeight;
-}
-
-function dayLabel(createdAt) {
-  const date = createdAt ? new Date(createdAt) : new Date();
-  const weekday = date.toLocaleDateString(undefined, { weekday: "long" }).toLowerCase();
-  const hour = Number.isFinite(date.getHours()) ? date.getHours() : new Date().getHours();
-  const part = hour < 5 ? "late night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
-  return `${weekday} ${part}`;
-}
-
-function likedCards(profile) {
-  return Object.entries(profile.responses || {})
-    .filter(([, value]) => value === true)
-    .map(([id]) => cardById(id))
-    .filter(Boolean);
-}
-
-function dislikedCards(profile) {
-  return Object.entries(profile.responses || {})
-    .filter(([, value]) => value === false)
-    .map(([id]) => cardById(id))
-    .filter(Boolean);
-}
-
-function unknownCards(profile) {
-  return Object.entries(profile.responses || {})
-    .filter(([, value]) => value === "unknown")
-    .map(([id]) => cardById(id))
-    .filter(Boolean);
-}
-
-function addWeighted(map, key, value) {
-  map[key] = (map[key] || 0) + value;
-}
-
-function isHighSignal(card) {
-  return card.kind === "controversial" || card.kind === "food";
-}
-
-function profileSignals(profile) {
-  const liked = likedCards(profile);
-  const disliked = dislikedCards(profile);
-  const signals = {
-    ingredients: {},
-    modes: {},
-    poles: {},
-    cardLikes: {},
-    cardDislikes: {},
-    controversialLikes: {},
-    controversialDislikes: {},
-  };
-
-  liked.forEach((card) => {
-    const cardWeight = isHighSignal(card) ? 2 + card.controversyWeight : 1;
-    addWeighted(signals.cardLikes, card.id, cardWeight);
-    card.epicure.ingredients.forEach((item) => addWeighted(signals.ingredients, item, cardWeight));
-    card.epicure.modes.forEach((item) => addWeighted(signals.modes, item, cardWeight * 1.15));
-    card.epicure.poles.forEach((item) => addWeighted(signals.poles, item, cardWeight));
-    if (isHighSignal(card)) addWeighted(signals.controversialLikes, card.id, card.controversyWeight);
-  });
-
-  disliked.forEach((card) => {
-    addWeighted(signals.cardDislikes, card.id, isHighSignal(card) ? 2 : 1);
-    if (isHighSignal(card)) addWeighted(signals.controversialDislikes, card.id, card.controversyWeight);
-  });
-
-  return signals;
-}
-
-function weightedJaccard(a, b) {
-  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-  if (!keys.size) return 0;
-  let overlap = 0;
-  let union = 0;
-  keys.forEach((key) => {
-    overlap += Math.min(a[key] || 0, b[key] || 0);
-    union += Math.max(a[key] || 0, b[key] || 0);
-  });
-  return union ? overlap / union : 0;
-}
-
-function compareProfiles(a, b) {
-  const sa = profileSignals(a);
-  const sb = profileSignals(b);
-  let sharedCards = intersectionKeys(sa.cardLikes, sb.cardLikes).map(cardById).filter(Boolean);
-  let sharedNiche = intersectionKeys(sa.controversialLikes, sb.controversialLikes).map(cardById).filter(Boolean);
-  const sharedSpecificIds = new Set(sharedCards.filter((card) => card.kind === "food").map((card) => card.id));
-  const hidesSpecificDuplicate = (card) => card.detailIds?.some((id) => sharedSpecificIds.has(id));
-  sharedCards = sharedCards.filter((card) => !hidesSpecificDuplicate(card));
-  sharedNiche = sharedNiche.filter((card) => !hidesSpecificDuplicate(card));
-  const conflictCards = [
-    ...intersectionKeys(sa.cardLikes, sb.cardDislikes),
-    ...intersectionKeys(sb.cardLikes, sa.cardDislikes),
-  ].map(cardById).filter(Boolean);
-  const restrictionConflicts = restrictionConflictsFor(a, b);
-
-  const broad = weightedJaccard(sa.cardLikes, sb.cardLikes);
-  const ingredient = weightedJaccard(sa.ingredients, sb.ingredients);
-  const mode = weightedJaccard(sa.modes, sb.modes);
-  const pole = weightedJaccard(sa.poles, sb.poles);
-  const nicheBonus = Math.min(18, sharedNiche.reduce((sum, card) => sum + card.controversyWeight * 2, 0));
-  const conflictPenalty = Math.min(22, conflictCards.reduce((sum, card) => sum + (isHighSignal(card) ? card.controversyWeight * 2 : 2), 0));
-  const restrictionPenalty = Math.min(18, restrictionConflicts.length * 5);
-  const score = Math.round(clamp(18 + ingredient * 30 + mode * 28 + pole * 12 + broad * 10 + nicheBonus - conflictPenalty - restrictionPenalty, 0, 100));
-  const recommendations = bridgeRecommendations(a, b, sa, sb);
-
-  return {
-    score,
-    components: { direct: broad, ingredient, mode, pole, nicheBonus, conflictPenalty, restrictionPenalty },
-    sharedCards,
-    sharedNiche,
-    conflictCards,
-    restrictionConflicts,
-    bridgeRecommendations: recommendations,
-    bridgeCards: recommendations.map((item) => item.card),
-    topIngredients: topSharedKeys(sa.ingredients, sb.ingredients, 10),
-    topModes: topSharedKeys(sa.modes, sb.modes, 6),
-  };
-}
-
-function restrictionConflictsFor(a, b) {
-  const aFilters = selectedFilters(a.restrictions || []);
-  const bFilters = selectedFilters(b.restrictions || []);
-  const conflicts = [];
-  likedCards(a).forEach((card) => {
-    if (card.restrictionTags.some((tag) => bFilters.has(tag))) conflicts.push(card);
-  });
-  likedCards(b).forEach((card) => {
-    if (card.restrictionTags.some((tag) => aFilters.has(tag))) conflicts.push(card);
-  });
-  return uniqueCards(conflicts);
-}
-
-function bridgeRecommendations(a, b, sa, sb) {
-  const disliked = new Set([...Object.keys(sa.cardDislikes), ...Object.keys(sb.cardDislikes)]);
-  const alreadyShared = new Set(intersectionKeys(sa.cardLikes, sb.cardLikes));
-  const filters = [...selectedFilters(a.restrictions || []), ...selectedFilters(b.restrictions || [])];
-  const blocked = new Set(filters);
-
-  return CARDS
-    .filter((card) => RECOMMENDABLE_KINDS.has(card.kind))
-    .filter((card) => !disliked.has(card.id) && !alreadyShared.has(card.id))
-    .filter((card) => !isBlockedByProfileDislikes(card, a) && !isBlockedByProfileDislikes(card, b))
-    .filter((card) => !card.restrictionTags.some((tag) => blocked.has(tag)))
-    .map((card) => {
-      const evidence = recommendationEvidence(card, sa, sb);
-      return { card, evidence, score: evidence.score };
-    })
-    .filter((item) => item.score >= 2)
-    .sort((aItem, bItem) => bItem.score - aItem.score)
-    .slice(0, 5);
-}
-
-function isBlockedByProfileDislikes(candidate, profile) {
-  const candidateKeys = new Set(dislikeBlockerKeys(candidate));
-  return dislikedCards(profile).some((card) => dislikeBlockerKeys(card).some((key) => candidateKeys.has(key)));
-}
-
-function dislikeBlockerKeys(card) {
-  return [...new Set([card.epicure.ingredients[0], ...card.epicure.coocSeeds].filter(Boolean))];
-}
-
-function recommendationEvidence(card, sa, sb) {
-  const sharedIngredients = card.epicure.ingredients.filter((item) => sa.ingredients[item] && sb.ingredients[item]);
-  const sharedModes = card.epicure.modes.filter((item) => sa.modes[item] && sb.modes[item]);
-  const sharedPoles = card.epicure.poles.filter((item) => sa.poles[item] && sb.poles[item]);
-  const aIngredientHits = card.epicure.ingredients.filter((item) => sa.ingredients[item]);
-  const bIngredientHits = card.epicure.ingredients.filter((item) => sb.ingredients[item]);
-  const aModeHits = card.epicure.modes.filter((item) => sa.modes[item]);
-  const bModeHits = card.epicure.modes.filter((item) => sb.modes[item]);
-  const aPoleHits = card.epicure.poles.filter((item) => sa.poles[item]);
-  const bPoleHits = card.epicure.poles.filter((item) => sb.poles[item]);
-  const crossIngredientSupport = Math.min(aIngredientHits.length, bIngredientHits.length);
-  const crossModeSupport = Math.min(aModeHits.length, bModeHits.length);
-  const exactSupport = (sa.cardLikes[card.id] ? 1 : 0) + (sb.cardLikes[card.id] ? 1 : 0);
-  const score = sharedIngredients.length * 5
-    + sharedModes.length * 4
-    + sharedPoles.length * 3
-    + crossIngredientSupport * 1.5
-    + crossModeSupport
-    + exactSupport;
-
-  return {
-    sharedIngredients,
-    sharedModes,
-    sharedPoles,
-    aIngredientHits,
-    bIngredientHits,
-    aModeHits,
-    bModeHits,
-    aPoleHits,
-    bPoleHits,
-    score,
-  };
-}
-
-function intersectionKeys(a, b) {
-  return Object.keys(a).filter((key) => b[key]);
-}
-
-function topSharedKeys(a, b, count) {
-  return intersectionKeys(a, b)
-    .map((key) => ({ key, score: Math.min(a[key], b[key]) }))
-    .sort((x, y) => y.score - x.score)
-    .slice(0, count)
-    .map((item) => item.key);
-}
-
-function topWeightedKeys(map, count) {
-  return Object.entries(map)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, count)
-    .map(([key]) => key);
-}
-
-function relationEvidence(cardA, cardB) {
-  const ingredients = overlap(cardA.epicure.ingredients, cardB.epicure.ingredients);
-  const modes = overlap(cardA.epicure.modes, cardB.epicure.modes);
-  const poles = overlap(cardA.epicure.poles, cardB.epicure.poles);
-  const coocSeeds = overlap(cardA.epicure.coocSeeds, cardB.epicure.coocSeeds);
-  return {
-    ingredients,
-    modes,
-    poles,
-    coocSeeds,
-    score: ingredients.length * 4 + modes.length * 3 + poles.length * 2 + coocSeeds.length,
-  };
-}
-
-function overlap(a, b) {
-  const bSet = new Set(b);
-  return a.filter((item) => bSet.has(item));
-}
-
-function boundaryCards(profile) {
-  const liked = likedCards(profile);
-  return dislikedCards(profile)
-    .map((disliked) => {
-      const related = liked
-        .map((likedCard) => ({ card: likedCard, evidence: relationEvidence(disliked, likedCard) }))
-        .filter((item) => item.evidence.score > 0)
-        .sort((a, b) => b.evidence.score - a.evidence.score)[0];
-      return related ? { card: disliked, related: related.card, evidence: related.evidence } : null;
-    })
-    .filter(Boolean)
-    .slice(0, 5);
-}
-
-function displayKey(key) {
-  const cleaned = key.includes("/") ? key.split("/").pop() : key;
-  const modeAliases = [
-    ["umami_score", "umami"],
-    ["sour_score", "sour"],
-    ["bitter_score", "bitter"],
-    ["sweet_score", "sweet"],
-    ["pungent_score", "pungent"],
-    ["fatty_score", "fatty"],
-    ["cf_balsamic", "briny / fermented"],
-    ["cf_earthy", "earthy"],
-    ["cf_meaty", "meaty / seafood umami"],
-    ["cf_citrus", "citrus"],
-    ["cf_woody", "woody / smoky"],
-    ["cf_minty", "herbal / spice"],
-    ["cf_savory", "savory"],
-    ["fg_Dairy", "dairy"],
-    ["fg_Spice", "spice"],
-    ["fg_Vegetable", "vegetable"],
-    ["usda_protein_g", "protein"],
-    ["cuisine:East_Asian", "East Asian"],
-    ["cuisine:Mediterranean", "Mediterranean"],
-    ["cuisine:South_Asian", "South Asian"],
-    ["cuisine:Latin_American", "Latin American"],
-    ["cuisine:Southeast_Asian", "Southeast Asian"],
-    ["cuisine:Western_Atlantic", "Western Atlantic"],
-  ];
-  const alias = modeAliases.find(([prefix]) => key.startsWith(prefix));
-  return (alias ? alias[1] : cleaned).replaceAll("_", " ");
-}
-
-function shortCardLabel(card) {
-  return (DAYLIST_WORDS[card.id]?.[0] || card.label)
-    .replace(" / ", " ")
-    .replace(" + ", " ")
-    .slice(0, 18);
-}
-
-function profileDriverSummary(profile) {
-  const signals = profileSignals(profile);
-  return {
-    ingredients: topWeightedKeys(signals.ingredients, 8),
-    modes: topWeightedKeys(signals.modes, 6),
-    poles: topWeightedKeys(signals.poles, 4),
-    boundaries: boundaryCards(profile),
-  };
-}
-
-function graphForProfile(profile) {
-  const liked = likedCards(profile).sort((a, b) => daylistWeight(b) - daylistWeight(a)).slice(0, 8);
-  const boundaries = boundaryCards(profile).map((item) => item.card);
-  const unknown = unknownCards(profile).slice(0, 3);
-  const cards = uniqueCards([...liked, ...boundaries, ...unknown]).slice(0, 14);
-  const drivers = profileDriverSummary(profile);
-  const modeNodes = drivers.modes.slice(0, 3).map((mode) => ({
-    id: `mode:${mode}`,
-    label: displayKey(mode),
-    kind: "mode",
-  }));
-  const nodes = [
-    ...cards.map((card) => ({
-      id: card.id,
-      label: shortCardLabel(card),
-      emoji: card.emoji,
-      kind: responseKind(profile.responses[card.id]),
-    })),
-    ...modeNodes,
-  ];
-
-  const edges = [];
-  for (let i = 0; i < cards.length; i += 1) {
-    for (let j = i + 1; j < cards.length; j += 1) {
-      const evidence = relationEvidence(cards[i], cards[j]);
-      if (evidence.score > 0) edges.push({ from: cards[i].id, to: cards[j].id, score: evidence.score, evidence });
-    }
-  }
-  modeNodes.forEach((modeNode) => {
-    const mode = modeNode.id.replace("mode:", "");
-    cards.forEach((card) => {
-      if (card.epicure.modes.includes(mode)) {
-        edges.push({ from: card.id, to: modeNode.id, score: 3, evidence: { modes: [mode] } });
-      }
-    });
-  });
-
-  return {
-    title: "Your Epicure food topology",
-    caption: "Edges connect foods that share Epicure canonical ingredients, modes, cuisine poles, or Cooc seeds.",
-    nodes,
-    edges: edges.sort((a, b) => b.score - a.score).slice(0, 22),
-  };
-}
-
-function graphForComparison(a, b, result) {
-  const cards = uniqueCards([
-    ...result.sharedNiche,
-    ...result.sharedCards,
-    ...result.conflictCards,
-    ...result.bridgeRecommendations.map((item) => item.card),
-  ]).slice(0, 14);
-  const modeNodes = result.topModes.slice(0, 3).map((mode) => ({
-    id: `mode:${mode}`,
-    label: displayKey(mode),
-    kind: "mode",
-  }));
-  const nodes = [
-    ...cards.map((card) => ({
-      id: card.id,
-      label: shortCardLabel(card),
-      emoji: card.emoji,
-      kind: compareNodeKind(card, a, b, result),
-    })),
-    ...modeNodes,
-  ];
-  const edges = [];
-  for (let i = 0; i < cards.length; i += 1) {
-    for (let j = i + 1; j < cards.length; j += 1) {
-      const evidence = relationEvidence(cards[i], cards[j]);
-      if (evidence.score > 0) edges.push({ from: cards[i].id, to: cards[j].id, score: evidence.score, evidence });
-    }
-  }
-  modeNodes.forEach((modeNode) => {
-    const mode = modeNode.id.replace("mode:", "");
-    cards.forEach((card) => {
-      if (card.epicure.modes.includes(mode)) {
-        edges.push({ from: card.id, to: modeNode.id, score: 3, evidence: { modes: [mode] } });
-      }
-    });
-  });
-  return {
-    title: "Why this match exists",
-    caption: "Shared modes and ingredients matter more than exact same-food overlap.",
-    nodes,
-    edges: edges.sort((x, y) => y.score - x.score).slice(0, 24),
-  };
-}
-
-function responseKind(response) {
-  if (response === true) return "liked";
-  if (response === false) return "disliked";
-  if (response === "unknown") return "unknown";
-  return "neutral";
-}
-
-function compareNodeKind(card, a, b, result) {
-  if (result.conflictCards.some((item) => item.id === card.id)) return "conflict";
-  if (result.bridgeRecommendations.some((item) => item.card.id === card.id)) return "bridge";
-  if (a.responses[card.id] === true && b.responses[card.id] === true) return "shared";
-  if (a.responses[card.id] === true || b.responses[card.id] === true) return "liked";
-  return "neutral";
-}
-
-function uniqueCards(cards) {
-  const seen = new Set();
-  return cards.filter((card) => {
-    if (seen.has(card.id)) return false;
-    seen.add(card.id);
-    return true;
-  });
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function render() {
-  if (state.route === "profile") return renderProfile();
-  if (state.route === "compare") return renderCompare();
-  if (state.route === "profiles") return renderProfileHistory();
-  renderQuiz();
-}
-
-function renderShell(content) {
-  app.innerHTML = `
-    <header class="topbar">
-      <div class="brand">
-        <div class="brand-mark">🍽️</div>
-        <div>
-          <h1>Food Match</h1>
-          <p>A tasting deck for eating together.</p>
-        </div>
-      </div>
-      <div class="top-actions">
-        <button class="pill-button" data-action="new-quiz" data-icon="↻">Retake</button>
-        <button class="pill-button" data-action="history" data-icon="☰">Profiles</button>
-      </div>
-    </header>
-    <section class="stage">${content}</section>
-    <footer class="source-strip">
-      Epicure mappings use canonical ingredients, Cooc/Core/Chem modes, and cuisine poles from
-      <a href="https://huggingface.co/Kaikaku/epicure-cooc" target="_blank" rel="noreferrer">Epicure Cooc</a>,
-      <a href="https://huggingface.co/Kaikaku/epicure-core" target="_blank" rel="noreferrer">Epicure Core</a>, and
-      <a href="https://arxiv.org/abs/2605.22391" target="_blank" rel="noreferrer">arXiv 2605.22391</a>.
-    </footer>
-    ${state.toast ? `<div class="toast">${escapeHtml(state.toast)}</div>` : ""}
-  `;
-  bindGlobalActions();
-}
-
-function renderQuiz() {
-  if (state.quiz.phase === "restrictions") {
     renderShell(`
-      <article class="tool-card quiz-card">
-        <div class="card-kicker">
-          ${state.incomingProfile ? `<span class="tag data">Comparing with ${escapeHtml(profileLabel(state.incomingProfile))}</span>` : ""}
-          <span class="tag good">Step 1</span>
+      <article class="results-card">
+        <div class="daylist-title">${esc(daylist)}</div>
+        <div class="daylist-sub">${esc(name)}'s taste profile</div>
+
+        <div class="score-ring">
+          <div class="score-number">${adventure}</div>
+          <div class="score-label">Adventure score</div>
         </div>
-        <div class="question">
-          <div class="emoji-hero">⚠️</div>
-          <h2>Ground rules</h2>
-          <p>Pick any restrictions. The quiz asks about specific foods by default and removes foods that should never appear.</p>
+
+        <div class="section-title">Cuisine DNA</div>
+        <div class="cuisine-bars">
+          ${CUISINES.map((c) => {
+            const val = affinities[c.id] || 0;
+            const pct = Math.max(0, Math.round(((val + 2) / 5) * 100));
+            return `
+              <div class="bar-row">
+                <span class="bar-label">${c.emoji} ${c.label}</span>
+                <div class="bar-track">
+                  <div class="bar-fill ${val > 0 ? "positive" : val < 0 ? "negative" : ""}" style="width: ${pct}%"></div>
+                </div>
+              </div>
+            `;
+          }).join("")}
         </div>
-        <label class="name-field">
-          <span>Name for this profile</span>
-          <input id="profile-name" type="text" maxlength="40" autocomplete="name" placeholder="Optional, e.g. Eve" value="${escapeHtml(state.quiz.name)}">
-        </label>
-        <div class="restriction-grid">
-          ${RESTRICTIONS.map(renderRestrictionButton).join("")}
+
+        ${restaurants.length ? `
+          <div class="section-title">Your restaurants</div>
+          <div class="restaurant-grid">
+            ${restaurants.slice(0, 8).map((r) => `
+              <div class="restaurant-card">
+                <span class="restaurant-emoji">${r.emoji}</span>
+                <span class="restaurant-name">${esc(r.name)}</span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        ${dishes.length ? `
+          <div class="section-title">Dishes you'd love</div>
+          <div class="dish-list">
+            ${dishes.slice(0, 10).map((d) => `<span class="dish-chip">${esc(d.dish)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        <div class="section-title">Taste signature</div>
+        <div class="taste-chips">
+          ${Object.entries(taste).sort((a, b) => b[1] - a[1]).map(([dim, val]) => {
+            const pct = Math.round((val / maxTaste) * 100);
+            return `<span class="taste-chip" style="--strength: ${pct}%">${dim} ${val}</span>`;
+          }).join("")}
         </div>
+
+        ${liked.length ? `
+          <div class="section-title">Loves</div>
+          <div class="food-grid">
+            ${liked.map((f) => `<span class="food-item">${f.emoji} ${esc(f.label)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        ${disliked.length ? `
+          <div class="section-title">Nope</div>
+          <div class="food-grid">
+            ${disliked.map((f) => `<span class="food-item dim">${f.emoji} ${esc(f.label)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        ${unknown.length ? `
+          <div class="section-title">Unexplored</div>
+          <div class="food-grid">
+            ${unknown.map((f) => `<span class="food-item unknown">${f.emoji} ${esc(f.label)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        <div class="section-title">Share</div>
         <div class="button-row">
-          <button class="primary-button" data-action="start-cards">Start quiz</button>
+          <button class="btn btn-primary" data-action="share-invite">\u{1F91D} Invite to compare</button>
+          <button class="btn btn-secondary" data-action="share-profile">\u{1F517} Share profile</button>
         </div>
       </article>
     `);
-    bindRestrictionActions();
-    return;
+    bindResultsEvents();
   }
 
-  const id = state.quiz.queue[state.quiz.index];
-  const card = cardById(id);
-  if (!card) return finishQuiz();
-  const percent = Math.round(((state.quiz.index) / Math.max(1, state.quiz.queue.length)) * 100);
-  const category = card.kind === "food" ? "Specific food" : card.detailIds ? "Food situation" : card.category;
-  renderShell(`
-    <article class="tool-card quiz-card">
-      <div class="progress-wrap">
-        <div class="progress-meta">
-          <span>${state.quiz.index + 1} / ${state.quiz.queue.length}</span>
-          <button class="ghost-button" data-action="finish-early">Finish</button>
-        </div>
-        <div class="progress-track"><div class="progress-bar" style="width: ${percent}%"></div></div>
-      </div>
-      <div class="card-kicker">
-        <span class="tag ${isHighSignal(card) ? "hot" : "good"}">${escapeHtml(category)}</span>
-        <span class="tag data">${escapeHtml(card.epicure.sourceModel.toUpperCase())}</span>
-        ${card.triggerIds ? `<span class="tag data">dynamic</span>` : ""}
-        ${card.detailIds ? `<span class="tag data">${card.detailIds.length} specifics</span>` : ""}
-      </div>
-      <div class="question">
-        <div class="emoji-hero">${card.emoji}</div>
-        <h2>${escapeHtml(card.label)}</h2>
-        <p>${escapeHtml(card.description)}</p>
-      </div>
-      ${renderClarifier(card)}
-      ${renderChoiceRow(card)}
-      ${renderTrace(card)}
-    </article>
-  `);
-  bindAnswerActions();
-}
+  function renderCompare() {
+    const profiles = state.compareProfiles;
+    if (!profiles || profiles.length < 2) return renderSetup();
 
-function renderChoiceRow(card) {
-  if (card.kind !== "food") {
-    const detailsButton = card.detailIds?.length
-      ? `<button class="choice-button details" data-answer="details"><span>🔎</span> Show foods</button>`
-      : "";
-    return `
-      <div class="choice-row moment ${card.detailIds?.length ? "has-details" : ""}">
-        <button class="choice-button like" data-answer="true"><span>👍</span> Usually yes</button>
-        <button class="choice-button dislike" data-answer="false"><span>👎</span> Usually no</button>
-        ${detailsButton}
-        <button class="choice-button skip" data-answer="skip"><span>↷</span> Skip</button>
+    const [a, b] = profiles;
+    const result = compareProfiles(a, b);
+    const aName = a.name || "Person 1";
+    const bName = b.name || "Person 2";
+
+    const sharedRests = suggestSharedRestaurants(a, b);
+    const sharedDishes = suggestSharedDishes(a, b);
+    const avoidDishes = suggestAvoidDishes(a, b);
+
+    renderShell(`
+      <article class="compare-card">
+        <div class="compare-header">
+          <span class="compare-name">${esc(aName)}</span>
+          <span class="compare-vs">\u00D7</span>
+          <span class="compare-name">${esc(bName)}</span>
+        </div>
+
+        <div class="match-score">
+          <div class="score-ring large">
+            <div class="score-number">${result.score}</div>
+            <div class="score-label">Match</div>
+          </div>
+        </div>
+
+        ${sharedRests.length ? `
+          <div class="section-title">Where to eat together</div>
+          <div class="restaurant-grid">
+            ${sharedRests.slice(0, 6).map((r) => `
+              <div class="restaurant-card">
+                <span class="restaurant-emoji">${r.emoji}</span>
+                <span class="restaurant-name">${esc(r.name)}</span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        ${sharedDishes.length ? `
+          <div class="section-title">Order these together</div>
+          <div class="dish-list">
+            ${sharedDishes.slice(0, 8).map((d) => `<span class="dish-chip">${esc(d.dish)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        ${result.sharedLikes.length ? `
+          <div class="section-title">You both love</div>
+          <div class="food-grid">
+            ${result.sharedLikes.map((f) => `<span class="food-item">${f.emoji} ${esc(f.label)}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        ${avoidDishes.length ? `
+          <div class="section-title">Skip these</div>
+          <div class="dish-list">
+            ${avoidDishes.slice(0, 5).map((d) => `
+              <span class="dish-chip conflict">${esc(d.dish)}
+                <small>${d.who === "a" ? esc(aName) + " won't eat this" : esc(bName) + " won't eat this"}</small>
+              </span>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        ${result.conflicts.length ? `
+          <div class="section-title">Watch out</div>
+          <div class="food-grid">
+            ${result.conflicts.map((f) => `
+              <span class="food-item conflict">${f.emoji} ${esc(f.label)}
+                <small>${f.who === "a" ? esc(aName) + " loves, " + esc(bName) + " doesn't" : esc(bName) + " loves, " + esc(aName) + " doesn't"}</small>
+              </span>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        ${result.bridges.length ? `
+          <div class="section-title">Introduce each other to</div>
+          <div class="food-grid">
+            ${result.bridges.map((f) => `
+              <span class="food-item bridge">${f.emoji} ${esc(f.label)}
+                <small>${f.from === "a" ? esc(aName) + " recommends" : esc(bName) + " recommends"}</small>
+              </span>
+            `).join("")}
+          </div>
+        ` : ""}
+
+        <div class="button-row">
+          <button class="btn btn-primary" data-action="share-compare">\u{1F517} Share comparison</button>
+          <button class="btn btn-secondary" data-action="new-quiz">\u21BB Take quiz</button>
+        </div>
+      </article>
+    `);
+    bindCompareEvents();
+  }
+
+  function renderHistory() {
+    const profiles = loadProfiles();
+    renderShell(`
+      <article class="results-card">
+        <h2 class="card-title">Saved profiles</h2>
+        ${profiles.length ? `
+          <div class="profile-list">
+            ${profiles.map((p) => `
+              <button class="profile-row" data-profile-id="${esc(p.id)}">
+                <span class="profile-name">${esc(p.name || "Unnamed")} \u2014 ${esc(generateDaylist(p))}</span>
+                <span class="profile-date">${new Date(p.t).toLocaleDateString()}</span>
+              </button>
+            `).join("")}
+          </div>
+        ` : `<p class="card-desc">No profiles yet. Take the quiz!</p>`}
+        <div class="button-row">
+          <button class="btn btn-primary" data-action="new-quiz">New quiz</button>
+        </div>
+      </article>
+    `);
+    document.querySelectorAll("[data-profile-id]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const profiles = loadProfiles();
+        const profile = profiles.find((p) => p.id === el.dataset.profileId);
+        if (profile) {
+          state.route = "profile";
+          state.profile = profile;
+          history.replaceState(null, "", profileUrl(profile));
+          render();
+        }
+      });
+    });
+    bindGlobalActions();
+  }
+
+  // ─── EVENT BINDING ─────────────────────────────────────────────
+
+  function bindGlobalActions() {
+    document.querySelectorAll("[data-action]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const action = el.dataset.action;
+        if (action === "new-quiz") {
+          state.quiz = null;
+          state.route = "quiz";
+          state.incomingProfile = null;
+          state.compareProfiles = null;
+          state.profile = null;
+          history.replaceState(null, "", baseUrl());
+          render();
+        }
+        if (action === "history") {
+          state.route = "history";
+          render();
+        }
+      });
+    });
+  }
+
+  function bindSetupEvents() {
+    const nameInput = document.getElementById("setup-name");
+    if (nameInput) {
+      nameInput.addEventListener("input", () => {
+        state.quiz.name = nameInput.value.trim().slice(0, 40);
+      });
+    }
+
+    document.querySelectorAll("[data-restriction]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.restriction;
+        const quiz = state.quiz;
+
+        if (id === "none") {
+          quiz.restrictions = [];
+        } else {
+          quiz.restrictions = quiz.restrictions.includes(id)
+            ? quiz.restrictions.filter((r) => r !== id)
+            : [...quiz.restrictions.filter((r) => r !== "none"), id];
+        }
+        // Re-render restriction grid
+        document.querySelectorAll("[data-restriction]").forEach((b) => {
+          b.classList.toggle("active", quiz.restrictions.includes(b.dataset.restriction) ||
+            (b.dataset.restriction === "none" && !quiz.restrictions.length));
+        });
+      });
+    });
+
+    const startBtn = document.querySelector('[data-action="start-quiz"]');
+    if (startBtn) {
+      startBtn.addEventListener("click", () => {
+        const quiz = state.quiz;
+        quiz.phase = "cuisines";
+        quiz.queue = CUISINES.map((c) => ({
+          id: "c:" + c.id,
+          type: "cuisine",
+          context: "Getting to know your taste",
+          label: c.label,
+          emoji: c.emoji,
+          desc: c.desc,
+          options: [
+            { label: "Love", value: 3, cls: "positive" },
+            { label: "Hate", value: -2, cls: "negative" },
+            { label: "Skip", value: "unknown", cls: "unknown" },
+          ],
+        }));
+        quiz.pos = 0;
+        quiz.responses = {};
+        quiz.modeCardsAdded = false;
+        quiz.ingredientCardsAdded = false;
+        quiz.probesInjected = new Set();
+        render();
+      });
+    }
+
+    bindGlobalActions();
+  }
+
+  function bindCardEvents() {
+    const finishBtn = document.querySelector('[data-action="finish-early"]');
+    if (finishBtn) {
+      finishBtn.addEventListener("click", () => {
+        state.quiz.phase = "done";
+        finishQuiz();
+      });
+    }
+
+    const SLIDER_VALUES = [-2, -1, 0, 1, 3];
+    const slider = document.querySelector(".taste-slider");
+    const submitBtn = document.querySelector('[data-action="slider-submit"]');
+    const skipBtn = document.querySelector('[data-action="slider-skip"]');
+
+    if (submitBtn && slider) {
+      submitBtn.addEventListener("click", () => {
+        handleAnswer(SLIDER_VALUES[parseInt(slider.value)]);
+      });
+    }
+
+    if (skipBtn) {
+      skipBtn.addEventListener("click", () => {
+        handleAnswer("unknown");
+      });
+    }
+
+    if (slider) {
+      const updateThumbColor = () => {
+        const idx = parseInt(slider.value);
+        const colors = ["#c85745", "#c85745", "#191816", "#2f7357", "#2f7357"];
+        slider.style.setProperty("--thumb-color", colors[idx]);
+      };
+      slider.addEventListener("input", updateThumbColor);
+      updateThumbColor();
+    }
+
+    initKeyboard();
+    bindGlobalActions();
+  }
+
+  function bindResultsEvents() {
+    document.querySelectorAll("[data-action]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const action = el.dataset.action;
+        if (action === "share-invite" && state.profile) {
+          copyToClipboard(inviteUrl(state.profile), "Invite link copied!");
+        }
+        if (action === "share-profile" && state.profile) {
+          copyToClipboard(profileUrl(state.profile), "Profile link copied!");
+        }
+      });
+    });
+    bindGlobalActions();
+  }
+
+  function bindCompareEvents() {
+    document.querySelectorAll("[data-action]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const action = el.dataset.action;
+        if (action === "share-compare" && state.compareProfiles) {
+          copyToClipboard(compareUrl(state.compareProfiles[0], state.compareProfiles[1]), "Comparison link copied!");
+        }
+        if (action === "new-quiz") {
+          state.quiz = null;
+          state.route = "quiz";
+          state.incomingProfile = null;
+          state.compareProfiles = null;
+          state.profile = null;
+          history.replaceState(null, "", baseUrl());
+          render();
+        }
+      });
+    });
+    bindGlobalActions();
+  }
+
+  // ─── CARD INTERACTION ──────────────────────────────────────────
+
+  function handleAnswer(value) {
+    const cardEl = document.querySelector(".quiz-card");
+    if (!cardEl) return;
+
+    let exitClass;
+    if (value === "unknown") exitClass = "exit-down";
+    else if (typeof value === "number" && value > 0) exitClass = "exit-right";
+    else exitClass = "exit-left";
+    cardEl.classList.add(exitClass);
+
+    respondToCard(state.quiz, value);
+
+    setTimeout(() => {
+      if (state.quiz.phase === "done") {
+        finishQuiz();
+      } else {
+        renderQuizCard();
+      }
+    }, 350);
+  }
+
+  function initKeyboard() {
+    const SLIDER_VALUES = [-2, -1, 0, 1, 3];
+    function onKey(e) {
+      const slider = document.querySelector(".taste-slider");
+      if (!slider) {
+        document.removeEventListener("keydown", onKey);
+        return;
+      }
+
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        slider.value = Math.min(4, parseInt(slider.value) + 1);
+        slider.dispatchEvent(new Event("input"));
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        slider.value = Math.max(0, parseInt(slider.value) - 1);
+        slider.dispatchEvent(new Event("input"));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        handleAnswer(SLIDER_VALUES[parseInt(slider.value)]);
+      } else if (e.key === "ArrowDown" || e.key === "s") {
+        e.preventDefault();
+        handleAnswer("unknown");
+      }
+    }
+    document.addEventListener("keydown", onKey);
+  }
+
+  // ─── ROUTING ───────────────────────────────────────────────────
+
+  function parseRoute() {
+    const hash = location.hash.slice(1);
+    if (!hash) {
+      state.route = "landing";
+      return render();
+    }
+
+    try {
+      if (hash.startsWith("take=")) {
+        state.incomingProfile = decodePayload(hash.slice(5));
+        state.quiz = newQuiz("", []);
+        state.route = "quiz";
+        return render();
+      }
+      if (hash.startsWith("profile=")) {
+        state.profile = decodePayload(hash.slice(8));
+        state.route = "profile";
+        return render();
+      }
+      if (hash.startsWith("compare=")) {
+        const parts = hash.slice(8).split(".");
+        state.compareProfiles = [decodePayload(parts[0]), decodePayload(parts[1])];
+        state.route = "compare";
+        return render();
+      }
+    } catch (e) {
+      showToast("Could not open that link");
+    }
+
+    state.route = "landing";
+    render();
+  }
+
+  // ─── UTILITIES ─────────────────────────────────────────────────
+
+  function esc(str) {
+    const div = document.createElement("div");
+    div.textContent = String(str || "");
+    return div.innerHTML;
+  }
+
+  function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function showToast(msg) {
+    state.toast = msg;
+    render();
+    setTimeout(() => {
+      state.toast = "";
+      const toastEl = document.querySelector(".toast");
+      if (toastEl) toastEl.remove();
+    }, 2500);
+  }
+
+  function copyToClipboard(text, successMsg) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast(successMsg || "Copied!"),
+      () => showToast("Could not copy")
+    );
+  }
+
+  // ─── INIT ──────────────────────────────────────────────────────
+
+  try {
+    epicure = await loadEpicure();
+    const loading = document.querySelector(".loading-screen");
+    if (loading) loading.classList.add("hidden");
+    parseRoute();
+  } catch (e) {
+    app.innerHTML = `
+      <div class="loading-screen">
+        <div class="loading-icon">\u26A0\uFE0F</div>
+        <p>Failed to load taste data. Try refreshing.</p>
+        <p style="color:var(--muted);font-size:0.8rem">${esc(e.message)}</p>
       </div>
     `;
   }
 
-  return `
-    <div class="choice-row food">
-      <button class="choice-button like" data-answer="true"><span>👍</span> Like</button>
-      <button class="choice-button dislike" data-answer="false"><span>👎</span> Don't like</button>
-      <button class="choice-button unknown" data-answer="unknown"><span>🤷</span> Don't know</button>
-    </div>
-  `;
-}
+  window.addEventListener("hashchange", parseRoute);
 
-function renderClarifier(card) {
-  const details = (card.detailIds || []).map(cardById).filter(Boolean);
-  const summary = card.kind === "food" ? "What is this?" : details.length ? "What foods count?" : "Why this card?";
-  const body = card.explain || card.description;
-  return `
-    <details class="clarifier">
-      <summary>${summary}</summary>
-      <p>${escapeHtml(body)}</p>
-      ${details.length ? `<div class="detail-preview">${details.map(renderCardChip).join("")}</div>` : ""}
-    </details>
-  `;
-}
-
-function renderRestrictionButton(restriction) {
-  const active = restriction.id === "no_restrictions"
-    ? state.quiz.restrictions.length === 0
-    : state.quiz.restrictions.includes(restriction.id);
-  return `
-    <button class="restriction-button ${active ? "active" : ""}" data-restriction="${restriction.id}">
-      ${restriction.emoji} ${escapeHtml(restriction.label)}
-    </button>
-  `;
-}
-
-function renderTrace(card) {
-  return `
-    <details class="trace">
-      <summary>Epicure trace</summary>
-      <div class="trace-grid">
-        ${traceGroup("Source", [card.epicure.sourceModel, card.epicure.basis])}
-        ${traceGroup("Canonical ingredients", card.epicure.ingredients)}
-        ${traceGroup("Modes", card.epicure.modes)}
-        ${traceGroup("Cuisine poles", card.epicure.poles)}
-        ${traceGroup("Cooc seeds", card.epicure.coocSeeds)}
-      </div>
-    </details>
-  `;
-}
-
-function traceGroup(label, items) {
-  if (!items.length) return "";
-  return `
-    <div class="trace-group">
-      <div class="trace-label">${escapeHtml(label)}</div>
-      <div class="trace-chips">${items.map((item) => `<span class="trace-chip">${escapeHtml(item)}</span>`).join("")}</div>
-    </div>
-  `;
-}
-
-function renderEvidenceGraph(graph) {
-  if (!graph.nodes.length) return "";
-  const positions = graphPositions(graph.nodes);
-  const lines = graph.edges
-    .filter((edge) => positions[edge.from] && positions[edge.to])
-    .map((edge) => {
-      const from = positions[edge.from];
-      const to = positions[edge.to];
-      return `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke-width="${Math.min(4, 1 + edge.score / 4)}"></line>`;
-    })
-    .join("");
-  const nodes = graph.nodes
-    .map((node) => {
-      const point = positions[node.id];
-      return `
-        <g class="graph-node ${escapeHtml(node.kind)}" transform="translate(${point.x} ${point.y})">
-          <circle r="${node.kind === "mode" ? 24 : 20}"></circle>
-          <text class="graph-emoji" y="${node.kind === "mode" ? -2 : -4}">${node.emoji || "◆"}</text>
-          <text class="graph-node-label" y="${node.kind === "mode" ? 34 : 32}">${escapeHtml(node.label)}</text>
-        </g>
-      `;
-    })
-    .join("");
-
-  return `
-    <article class="tool-card panel graph-panel">
-      <div>
-        <h3>${escapeHtml(graph.title)}</h3>
-        <p>${escapeHtml(graph.caption)}</p>
-      </div>
-      <svg class="food-graph" viewBox="0 0 360 280" role="img" aria-label="${escapeHtml(graph.title)}">
-        <g class="graph-edges">${lines}</g>
-        <g>${nodes}</g>
-      </svg>
-      <div class="graph-legend">
-        <span><i class="liked"></i>liked/shared</span>
-        <span><i class="disliked"></i>boundary</span>
-        <span><i class="unknown"></i>unknown</span>
-        <span><i class="bridge"></i>bridge</span>
-        <span><i class="mode"></i>Epicure mode</span>
-      </div>
-    </article>
-  `;
-}
-
-function graphPositions(nodes) {
-  const positions = {};
-  const modeNodes = nodes.filter((node) => node.kind === "mode");
-  const foodNodes = nodes.filter((node) => node.kind !== "mode");
-  modeNodes.forEach((node, index) => {
-    const offset = (index - (modeNodes.length - 1) / 2) * 70;
-    positions[node.id] = { x: 180 + offset, y: 138 };
-  });
-  foodNodes.forEach((node, index) => {
-    const angle = (-Math.PI / 2) + (index / Math.max(1, foodNodes.length)) * Math.PI * 2;
-    positions[node.id] = {
-      x: Math.round(180 + Math.cos(angle) * 135),
-      y: Math.round(138 + Math.sin(angle) * 88),
-    };
-  });
-  return positions;
-}
-
-function renderGeneralizedReadout(profile) {
-  const summary = profileDriverSummary(profile);
-  return `
-    <article class="tool-card panel">
-      <h3>Generalized profile</h3>
-      <p>This readout is built from Epicure ingredients and modes, so it can generalize beyond exact foods.</p>
-      <div class="evidence-grid">
-        ${evidenceBlock("Ingredient center", summary.ingredients.map(displayKey))}
-        ${evidenceBlock("Mode center", summary.modes.map(displayKey))}
-        ${evidenceBlock("Cuisine pull", summary.poles.map(displayKey))}
-      </div>
-      ${summary.boundaries.length ? `
-        <div class="boundary-list">
-          <h3>Boundaries</h3>
-          ${summary.boundaries.map(renderBoundary).join("")}
-        </div>
-      ` : ""}
-    </article>
-  `;
-}
-
-function evidenceBlock(title, items) {
-  return `
-    <div class="evidence-block">
-      <strong>${escapeHtml(title)}</strong>
-      <div class="mini-list">${items.length ? items.map((item) => `<span class="status-chip">${escapeHtml(item)}</span>`).join("") : `<span class="status-chip">not enough signal</span>`}</div>
-    </div>
-  `;
-}
-
-function renderBoundary(item) {
-  const evidence = [
-    ...item.evidence.ingredients.map(displayKey),
-    ...item.evidence.modes.map(displayKey),
-    ...item.evidence.poles.map(displayKey),
-  ].slice(0, 3);
-  return `
-    <div class="boundary-row">
-      <span>${item.card.emoji} ${escapeHtml(item.card.label)}</span>
-      <small>near ${item.related.emoji} ${escapeHtml(item.related.label)} through ${escapeHtml(evidence.join(", ") || "Epicure overlap")}</small>
-    </div>
-  `;
-}
-
-function renderMatchEvidence(result) {
-  return `
-    <article class="tool-card panel">
-      <h3>Score evidence</h3>
-      <p>The score favors generalized overlap in Epicure ingredient and mode space, then adds exact niche-food agreement.</p>
-      <div class="evidence-bars">
-        ${evidenceBar("Ingredient space", result.components.ingredient)}
-        ${evidenceBar("Mode space", result.components.mode)}
-        ${evidenceBar("Cuisine poles", result.components.pole)}
-        ${evidenceBar("Exact food overlap", result.components.direct)}
-      </div>
-      <div class="evidence-grid">
-        ${evidenceBlock("Shared ingredients", result.topIngredients.map(displayKey))}
-        ${evidenceBlock("Shared modes", result.topModes.map(displayKey))}
-      </div>
-    </article>
-  `;
-}
-
-function evidenceBar(label, value) {
-  const percent = Math.round(value * 100);
-  return `
-    <div class="evidence-bar">
-      <div><strong>${escapeHtml(label)}</strong><span>${percent}%</span></div>
-      <div class="evidence-track"><span style="width: ${percent}%"></span></div>
-    </div>
-  `;
-}
-
-function renderRecommendations(recommendations, a, b) {
-  return `
-    <article class="tool-card panel">
-      <h3>Substantiated recommendations</h3>
-      <p>These are concrete food or dish-pair candidates supported by shared Epicure ingredients, modes, or cuisine poles, then filtered against restrictions and ingredient-level dislikes.</p>
-      <div class="recommendation-list">
-        ${recommendations.length ? recommendations.map((item) => renderRecommendation(item, a, b)).join("") : `<div class="empty">Not enough shared generalized signal yet.</div>`}
-      </div>
-    </article>
-  `;
-}
-
-function renderRecommendation(item, a, b) {
-  const evidence = [
-    ...item.evidence.sharedIngredients.map(displayKey),
-    ...item.evidence.sharedModes.map(displayKey),
-    ...item.evidence.sharedPoles.map(displayKey),
-  ].slice(0, 5);
-  const aSupport = recommendationSupport(item.evidence.aIngredientHits, item.evidence.aModeHits, item.evidence.aPoleHits);
-  const bSupport = recommendationSupport(item.evidence.bIngredientHits, item.evidence.bModeHits, item.evidence.bPoleHits);
-  return `
-    <div class="recommendation-row">
-      <strong>${item.card.emoji} ${escapeHtml(item.card.label)}</strong>
-      <p>Shared basis: ${escapeHtml(evidence.join(", ") || "cross-profile Epicure proximity")}.</p>
-      <div class="support-grid">
-        <small>${escapeHtml(profileName(a, "Profile A"))}: ${escapeHtml(aSupport)}</small>
-        <small>${escapeHtml(profileName(b, "Profile B"))}: ${escapeHtml(bSupport)}</small>
-      </div>
-    </div>
-  `;
-}
-
-function recommendationSupport(ingredients, modes, poles) {
-  const terms = [
-    ...ingredients.map(displayKey),
-    ...modes.map(displayKey),
-    ...poles.map(displayKey),
-  ].slice(0, 4);
-  return terms.length ? terms.join(", ") : "weak direct support";
-}
-
-function profileName(profile, fallback) {
-  return normalizeName(profile.name) || fallback;
-}
-
-function renderProfile() {
-  const profile = state.selectedProfile;
-  const liked = likedCards(profile);
-  const unknown = unknownCards(profile);
-  const invite = inviteUrl(profile);
-  const profileLink = profileUrl(profile);
-  renderShell(`
-    <article class="tool-card panel">
-      <div class="card-kicker">
-        <span class="tag good">Saved locally</span>
-        <span class="tag data">${escapeHtml(profile.id)}</span>
-      </div>
-      <h2>${escapeHtml(profileLabel(profile))}</h2>
-      <p class="profile-subtitle">profile ${escapeHtml(profile.id.slice(-5).toUpperCase())}</p>
-      <p>This profile can be retaken anytime. The invite link carries this profile so a friend can quiz and compare without an account.</p>
-      <div class="button-row">
-        <button class="primary-button" data-copy="${escapeHtml(invite)}" data-metric="inviteShares" data-profile-id="${escapeHtml(profile.id)}">Copy friend invite</button>
-        <button class="secondary-button" data-copy="${escapeHtml(profileLink)}" data-metric="profileLinkShares">Copy profile link</button>
-        <button class="ghost-button" data-action="new-quiz">Retake</button>
-      </div>
-    </article>
-    ${renderGeneralizedReadout(profile)}
-    ${renderEvidenceGraph(graphForProfile(profile))}
-    <article class="tool-card panel">
-      <h3>Liked signals</h3>
-      ${liked.length ? `<div class="mini-list">${liked.map(renderCardChip).join("")}</div>` : `<div class="empty">No likes were selected.</div>`}
-    </article>
-    ${unknown.length ? `
-      <article class="tool-card panel">
-        <h3>Foods to learn later</h3>
-        <div class="mini-list">${unknown.map(renderCardChip).join("")}</div>
-      </article>
-    ` : ""}
-  `);
-  bindCopyActions();
-}
-
-function renderCompare() {
-  const [a, b] = state.compareProfiles;
-  const result = compareProfiles(a, b);
-  renderShell(`
-    <article class="tool-card panel">
-      <div class="score-band">
-        <div class="score-number">${result.score}</div>
-        <div>
-          <h2>${escapeHtml(profileLabel(a))} × ${escapeHtml(profileLabel(b))}</h2>
-          <p class="profile-subtitle">${escapeHtml(a.id.slice(-5).toUpperCase())} × ${escapeHtml(b.id.slice(-5).toUpperCase())}</p>
-          <p>${scoreLine(result)}</p>
-        </div>
-      </div>
-      <div class="button-row">
-        <button class="primary-button" data-copy="${escapeHtml(compareUrl(a, b))}" data-metric="comparisonShares">Copy comparison</button>
-        <button class="secondary-button" data-copy="${escapeHtml(inviteUrl(a))}" data-metric="inviteShares" data-profile-id="${escapeHtml(a.id)}">Invite another friend</button>
-        <button class="ghost-button" data-action="new-quiz">Retake</button>
-      </div>
-    </article>
-    <section class="result-grid">
-      ${resultPanel("🔥 Shared niche loves", result.sharedNiche, "The weed-out foods you both like.")}
-      ${resultPanel("✅ Safe bets", result.sharedCards, "Cards both profiles liked.")}
-      ${resultPanel("⚠️ Danger zone", [...result.conflictCards, ...result.restrictionConflicts], "Like/dislike clashes or restriction conflicts.")}
-      ${resultPanel("🔁 Bridge foods", result.bridgeCards, "Cooc/Core candidates close to both profiles.")}
-    </section>
-    ${renderEvidenceGraph(graphForComparison(a, b, result))}
-    ${renderMatchEvidence(result)}
-    ${renderRecommendations(result.bridgeRecommendations, a, b)}
-  `);
-  bindCopyActions();
-}
-
-function resultPanel(title, cards, emptyText) {
-  return `
-    <article class="tool-card mini-card">
-      <strong>${title}</strong>
-      ${cards.length ? `<div class="mini-list">${uniqueCards(cards).map(renderCardChip).join("")}</div>` : `<p>${emptyText}</p>`}
-    </article>
-  `;
-}
-
-function scoreLine(result) {
-  if (result.sharedNiche.length >= 3) return "Extremely useful overlap: shared niche foods are doing real work here.";
-  if (result.score >= 75) return "Strong overlap across meal shapes, ingredients, and Epicure modes.";
-  if (result.score >= 50) return "Good bridge potential with a few clear watch-outs.";
-  if (result.conflictCards.length) return "There are real taste clashes. The danger zone matters.";
-  return "Light overlap. Use the bridge foods before picking a restaurant.";
-}
-
-function renderCardChip(card) {
-  return `<span class="status-chip">${card.emoji} ${escapeHtml(card.label)}</span>`;
-}
-
-function renderProfileHistory() {
-  const profiles = loadProfiles();
-  renderShell(`
-    ${renderStatsPanel(profiles)}
-    <article class="tool-card panel">
-      <h2>Profiles</h2>
-      <p>Profiles live in this browser. Share links carry the profile data to friends.</p>
-      <div class="button-row">
-        <button class="primary-button" data-action="new-quiz">New quiz</button>
-      </div>
-    </article>
-    <section class="profile-grid">
-      ${profiles.length ? profiles.map(renderProfileHistoryCard).join("") : `<div class="empty">No profiles saved yet.</div>`}
-    </section>
-  `);
-  bindCopyActions();
-}
-
-function renderStatsPanel(profiles) {
-  const metrics = loadMetrics();
-  const shareTotal = (metrics.inviteShares || 0) + (metrics.profileLinkShares || 0) + (metrics.comparisonShares || 0);
-  return `
-    <article class="tool-card panel">
-      <h2>Stats</h2>
-      <p>Local tracking for this browser. Real link opens across friends would need a hosted backend.</p>
-      <div class="stats-grid">
-        ${renderStat("Profiles saved", profiles.length)}
-        ${renderStat("Profiles created", metrics.profilesCreated || 0)}
-        ${renderStat("Shares copied", shareTotal)}
-        ${renderStat("Friend invites", metrics.inviteShares || 0)}
-        ${renderStat("Comparison links", metrics.comparisonShares || 0)}
-        ${renderStat("Comparisons made", metrics.comparisonsCreated || 0)}
-        ${renderStat("Invite opens here", metrics.incomingInviteOpens || 0)}
-      </div>
-    </article>
-  `;
-}
-
-function renderStat(label, value) {
-  return `
-    <div class="stat-card">
-      <strong>${escapeHtml(value)}</strong>
-      <span>${escapeHtml(label)}</span>
-    </div>
-  `;
-}
-
-function renderProfileHistoryCard(profile) {
-  const liked = likedCards(profile).slice(0, 4);
-  const metrics = loadMetrics();
-  const inviteShareCount = metrics.perProfileInviteShares[profile.id] || 0;
-  return `
-    <article class="tool-card mini-card">
-      <strong>${escapeHtml(profileLabel(profile))}</strong>
-      <p>${new Date(profile.createdAt).toLocaleString()}</p>
-      <div class="mini-list"><span class="status-chip">🔗 ${inviteShareCount} invite shares</span></div>
-      <div class="mini-list">${liked.map(renderCardChip).join("") || `<span class="status-chip">No likes</span>`}</div>
-      <div class="button-row">
-        <button class="secondary-button" data-copy="${escapeHtml(inviteUrl(profile))}" data-metric="inviteShares" data-profile-id="${escapeHtml(profile.id)}">Invite</button>
-        <button class="ghost-button" data-open-profile="${escapeHtml(encodePayload(profile))}">Open</button>
-      </div>
-    </article>
-  `;
-}
-
-function bindGlobalActions() {
-  document.querySelectorAll("[data-action='new-quiz']").forEach((button) => {
-    button.addEventListener("click", () => {
-      history.replaceState(null, "", baseUrl());
-      beginQuiz();
-    });
-  });
-  document.querySelectorAll("[data-action='history']").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.route = "profiles";
-      render();
-    });
-  });
-  document.querySelectorAll("[data-action='finish-early']").forEach((button) => {
-    button.addEventListener("click", finishQuiz);
-  });
-}
-
-function bindRestrictionActions() {
-  document.querySelector("#profile-name")?.addEventListener("input", (event) => {
-    state.quiz.name = event.target.value;
-  });
-  document.querySelectorAll("[data-restriction]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = button.dataset.restriction;
-      if (id === "no_restrictions") {
-        state.quiz.restrictions = [];
-      } else if (state.quiz.restrictions.includes(id)) {
-        state.quiz.restrictions = state.quiz.restrictions.filter((item) => item !== id);
-      } else {
-        state.quiz.restrictions.push(id);
-      }
-      render();
-    });
-  });
-  document.querySelector("[data-action='start-cards']")?.addEventListener("click", startCards);
-}
-
-function bindAnswerActions() {
-  document.querySelectorAll("[data-answer]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const raw = button.dataset.answer;
-      const answer = raw === "true" ? true : raw === "false" ? false : raw;
-      answerCurrent(answer === "skip" ? null : answer);
-    });
-  });
-}
-
-function bindCopyActions() {
-  document.querySelectorAll("[data-copy]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      await copyText(button.dataset.copy);
-      if (button.dataset.metric) {
-        recordMetric(button.dataset.metric, button.dataset.profileId || null);
-      }
-      showToast("Link copied");
-    });
-  });
-  document.querySelectorAll("[data-open-profile]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const profile = decodePayload(button.dataset.openProfile);
-      state.route = "profile";
-      state.selectedProfile = profile;
-      history.replaceState(null, "", profileUrl(profile));
-      render();
-    });
-  });
-}
-
-async function copyText(text) {
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.focus();
-  textarea.select();
-  document.execCommand("copy");
-  textarea.remove();
-}
-
-function showToast(message) {
-  state.toast = message;
-  render();
-  window.setTimeout(() => {
-    state.toast = "";
-    render();
-  }, 1600);
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-window.addEventListener("hashchange", parseRoute);
-parseRoute();
+})();
