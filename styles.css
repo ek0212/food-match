@@ -1030,6 +1030,17 @@ input[type="text"]::placeholder {
   align-items: center;
 }
 
+.done-panel h2,
+.history-panel h2 {
+  max-width: none;
+  margin: 0 auto;
+}
+
+.done-panel .btn-row,
+.history-panel .btn-row {
+  justify-content: center;
+}
+
 .profile-list {
   width: 100%;
   margin-top: 18px;
