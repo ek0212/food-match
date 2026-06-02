@@ -1163,7 +1163,11 @@ input[type="text"]::placeholder {
     align-items: flex-start;
   }
 
-  .brand-lockup span {
+  button.brand-lockup span {
+    display: none;
+  }
+
+  .signal-panel {
     display: none;
   }
 
