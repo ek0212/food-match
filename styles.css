@@ -83,11 +83,22 @@ a {
   padding: 10px 0 22px;
 }
 
-.brand-lockup {
+button.brand-lockup {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+}
+
+button.brand-lockup:hover .brand-mark {
+  box-shadow: 5px 5px 0 var(--green);
+  border-color: var(--green);
 }
 
 .brand-mark,
@@ -103,6 +114,7 @@ a {
   color: var(--ink);
   font-weight: 900;
   box-shadow: 4px 4px 0 var(--yellow);
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
 .brand-lockup h1 {
@@ -735,6 +747,7 @@ input[type="text"]::placeholder {
 
 .source-note,
 .empty-state {
+  width: 100%;
   padding: 12px;
   border: 1px dashed var(--line);
   border-radius: var(--radius);
@@ -1012,9 +1025,13 @@ input[type="text"]::placeholder {
   margin: 40px auto 0;
   padding: 34px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .profile-list {
+  width: 100%;
   margin-top: 18px;
 }
 

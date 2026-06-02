@@ -1493,20 +1493,23 @@
   }
 
   function shell(content) {
+    const onLanding = !state.quiz || state.quiz.phase === "setup";
+    const onHistory = state.route === "history";
+    const navButtons = [];
+    if (!onLanding) navButtons.push(`<button data-action="new-quiz">Retake</button>`);
+    if (!onHistory) navButtons.push(`<button data-action="history">Profiles</button>`);
+
     app.innerHTML = `
       <div class="shell">
         <header class="header">
-          <div class="brand-lockup">
+          <button class="brand-lockup" data-action="home" aria-label="Go to home page">
             <div class="brand-mark" aria-hidden="true">\u{1F37D}\uFE0F</div>
             <div>
               <h1>Food Match</h1>
               <span>Recipe-map taste matcher</span>
             </div>
-          </div>
-          <nav>
-            <button data-action="new-quiz">Retake</button>
-            <button data-action="history">Profiles</button>
-          </nav>
+          </button>
+          ${navButtons.length ? `<nav>${navButtons.join("")}</nav>` : ""}
         </header>
         ${content}
         <footer class="footer">
@@ -2117,6 +2120,15 @@
     document.querySelectorAll("[data-action]").forEach((el) => {
       el.addEventListener("click", () => {
         const action = el.dataset.action;
+        if (action === "home") {
+          state.quiz = null;
+          state.route = "quiz";
+          state.incomingProfile = null;
+          state.compareProfiles = null;
+          state.profile = null;
+          history.replaceState(null, "", baseUrl());
+          render();
+        }
         if (action === "new-quiz") {
           state.quiz = null;
           state.route = "quiz";
