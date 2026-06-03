@@ -23,6 +23,17 @@
     { value: 1, key: "4", label: "Yes", tone: "r4" },
     { value: 3, key: "5", label: "Crave it", tone: "r5" },
   ];
+  const ADVENTURE_MIN_CONTROVERSY = 3;
+  const ADVENTURE_CREDITS = {
+    "-2": 0,
+    "-1": 0.18,
+    0: 0.45,
+    1: 0.78,
+    3: 1,
+  };
+  const CUISINE_DIRECT_WEIGHT = 2;
+  const CUISINE_MODE_WEIGHT = 0.8;
+  const CUISINE_INGREDIENT_WEIGHT = 0.25;
   const app = document.getElementById("app");
 
   const CUISINES = [
@@ -947,27 +958,126 @@
 
   function cuisineAffinities(profile) {
     const affinities = {};
-    CUISINES.forEach((c) => {
-      const resp = profile.responses["c:" + c.id];
-      affinities[c.id] = typeof resp === "number" ? resp : 0;
+    buildCuisineEvidence(profile).forEach((row) => {
+      affinities[row.id] = row.score;
     });
     return affinities;
   }
 
+  function buildCuisineEvidence(profile) {
+    const rows = {};
+    CUISINES.forEach((c) => {
+      rows[c.id] = {
+        id: c.id,
+        label: CUISINE_DISPLAY[c.id] || c.id,
+        direct: null,
+        cluster: 0,
+        ingredient: 0,
+        score: 0,
+      };
+    });
+
+    Object.entries(profile.responses || {}).forEach(([id, value]) => {
+      if (typeof value !== "number") return;
+
+      if (id.startsWith("c:")) {
+        const cuisineId = id.slice(2);
+        if (rows[cuisineId]) rows[cuisineId].direct = value;
+        return;
+      }
+
+      if (id.startsWith("m:")) {
+        const mode = epicure ? epicure.modeById[id.slice(2)] : null;
+        distributeCuisineEvidence(rows, modeCuisineIds(mode), value, CUISINE_MODE_WEIGHT, "cluster");
+        return;
+      }
+
+      if (id.startsWith("i:")) {
+        const modes = epicure ? epicure.ingredientModes[id.slice(2)] || [] : [];
+        modes.slice(0, 3).forEach((modeId) => {
+          const mode = epicure ? epicure.modeById[modeId] : null;
+          distributeCuisineEvidence(rows, modeCuisineIds(mode), value, CUISINE_INGREDIENT_WEIGHT / 3, "ingredient");
+        });
+      }
+    });
+
+    return Object.values(rows).map((row) => {
+      const direct = row.direct == null ? 0 : row.direct * CUISINE_DIRECT_WEIGHT;
+      return {
+        ...row,
+        cluster: roundSignal(row.cluster),
+        ingredient: roundSignal(row.ingredient),
+        score: roundSignal(direct + row.cluster + row.ingredient),
+      };
+    });
+  }
+
+  function distributeCuisineEvidence(rows, cuisineIds, value, weight, field) {
+    if (!cuisineIds.length) return;
+    const contribution = (value * weight) / cuisineIds.length;
+    cuisineIds.forEach((cuisineId) => {
+      if (rows[cuisineId]) rows[cuisineId][field] += contribution;
+    });
+  }
+
+  function modeCuisineIds(mode) {
+    if (!mode || !epicure) return [];
+    const official = epicure.modeCuisines[mode.id] || [];
+    return [...new Set(official)];
+  }
+
+  function roundSignal(value) {
+    return Math.round(value * 10) / 10;
+  }
+
   function adventureScore(profile) {
-    let total = 0;
+    return adventureBreakdown(profile).score;
+  }
+
+  function adventureBreakdown(profile) {
+    let possible = 0;
+    let earned = 0;
+    let tested = 0;
     let accepted = 0;
-    Object.entries(profile.responses).forEach(([id, value]) => {
+    let neutral = 0;
+    let passed = 0;
+    let skipped = 0;
+
+    Object.entries(profile.responses || {}).forEach(([id, value]) => {
       if (id.startsWith("i:")) {
         const ing = id.slice(2);
         const c = ingredientControversy(ing);
-        if (c >= 3) {
-          total += c;
-          if (typeof value === "number" && value > 0) accepted += c;
+        if (c < ADVENTURE_MIN_CONTROVERSY) return;
+        const credit = adventureCredit(value);
+        if (credit == null) {
+          skipped++;
+          return;
         }
+        possible += c;
+        earned += c * credit;
+        tested++;
+        if (value > 0) accepted++;
+        else if (value < 0) passed++;
+        else neutral++;
       }
     });
-    return total > 0 ? Math.round((accepted / total) * 100) : 50;
+
+    return {
+      score: possible > 0 ? Math.round((earned / possible) * 100) : 50,
+      earned,
+      possible,
+      tested,
+      accepted,
+      neutral,
+      passed,
+      skipped,
+    };
+  }
+
+  function adventureCredit(value) {
+    if (value === "unknown") return null;
+    if (typeof value !== "number") return null;
+    return ADVENTURE_CREDITS[value] ?? 0;
   }
 
   function tasteSignature(profile) {
@@ -1113,6 +1223,100 @@
     { dish: "Oysters on the half shell", triggers: ["oyster"], cuisine: "Western_Atlantic" },
   ];
 
+  const FRINGE_RECIPES = [
+    {
+      title: "Natto rice bowl",
+      cuisine: "Japanese",
+      keys: ["natto", "soy_sauce"],
+      fringe: 8,
+      note: "Sticky fermented soybeans over warm rice with soy, scallion, and mustard.",
+    },
+    {
+      title: "Century egg congee",
+      cuisine: "East_Asian",
+      keys: ["century_egg", "ginger"],
+      fringe: 8,
+      note: "Silky rice porridge with preserved egg, ginger, and a little sesame oil.",
+    },
+    {
+      title: "Sea urchin hand roll",
+      cuisine: "Japanese",
+      keys: ["sea_urchin", "nori"],
+      fringe: 8,
+      note: "Creamy uni wrapped with rice and seaweed, best as a small first bite.",
+    },
+    {
+      title: "Stinky tofu with chili crisp",
+      cuisine: "East_Asian",
+      keys: ["stinky_tofu", "chili_oil"],
+      fringe: 9,
+      note: "A crunchy fermented tofu snack with heat, acid, and serious aroma.",
+    },
+    {
+      title: "Laksa with shrimp paste",
+      cuisine: "Southeast_Asian",
+      keys: ["shrimp_paste", "coconut_milk", "lemongrass"],
+      fringe: 7,
+      note: "Coconut noodle soup with fermented seafood depth and bright herbs.",
+    },
+    {
+      title: "Mapo tofu with fermented black beans",
+      cuisine: "East_Asian",
+      keys: ["sichuan_peppercorn", "fermented_black_bean", "tofu"],
+      fringe: 6,
+      note: "Numbing heat, soft tofu, and salty fermented bean sauce.",
+    },
+    {
+      title: "Oysters with mignonette",
+      cuisine: "Western_Atlantic",
+      keys: ["oyster", "rice_vinegar"],
+      fringe: 6,
+      note: "Cold briny oysters with a sharp vinegar and shallot spoon sauce.",
+    },
+    {
+      title: "Blue cheese fig toast",
+      cuisine: "Western_Atlantic",
+      keys: ["blue_cheese", "fig"],
+      fringe: 6,
+      note: "Sharp cheese, jammy fruit, and toast for a controlled funk test.",
+    },
+    {
+      title: "Bone marrow toast",
+      cuisine: "Western_Atlantic",
+      keys: ["bone_marrow"],
+      fringe: 7,
+      note: "Roasted marrow spread on toast with herbs and something acidic.",
+    },
+    {
+      title: "Tripe tacos in salsa roja",
+      cuisine: "Latin_American",
+      keys: ["tripe", "chipotle_pepper"],
+      fringe: 7,
+      note: "Chewy honeycomb tripe with smoky chile salsa and lime.",
+    },
+    {
+      title: "Durian sticky rice",
+      cuisine: "Southeast_Asian",
+      keys: ["durian", "coconut_milk"],
+      fringe: 9,
+      note: "Creamy tropical fruit with coconut rice, sweet enough to soften the edge.",
+    },
+    {
+      title: "Black garlic mushroom noodles",
+      cuisine: "East_Asian",
+      keys: ["black_garlic", "shiitake_mushroom"],
+      fringe: 4,
+      note: "Molasses-like aged garlic with earthy mushrooms and chewy noodles.",
+    },
+    {
+      title: "Balut with chili vinegar",
+      cuisine: "Southeast_Asian",
+      keys: ["balut", "chili_oil", "rice_vinegar"],
+      fringe: 10,
+      note: "A tiny, high-commitment street-food taste with acid and heat.",
+    },
+  ];
+
   function profileLikedIngredients(profile) {
     const liked = new Set();
     Object.entries(profile.responses).forEach(([id, v]) => {
@@ -1163,6 +1367,44 @@
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
+  }
+
+  function suggestFringeRecipes(profile) {
+    const liked = profileLikedIngredients(profile);
+    const disliked = profileDislikedIngredients(profile);
+    const affinities = cuisineAffinities(profile);
+    const adventure = adventureScore(profile);
+    const restrictions = profile.restrictions || [];
+
+    return FRINGE_RECIPES
+      .map((recipe) => {
+        const blocked = recipe.keys.some((key) => !isIngredientAllowed(key, restrictions));
+        const misses = recipe.keys.filter((key) => disliked.has(key));
+        if (blocked || misses.length) return null;
+
+        const hits = recipe.keys.filter((key) => liked.has(key));
+        const cuisineScore = Math.max(0, affinities[recipe.cuisine] || 0);
+        const adventureFit = 100 - Math.abs(adventure - recipe.fringe * 10);
+        let score = recipe.fringe + hits.length * 8 + cuisineScore * 2 + adventureFit / 20;
+        if (!hits.length && cuisineScore <= 0) score -= 5;
+        if (adventure < 35 && recipe.fringe >= 8) score -= 6;
+
+        return {
+          ...recipe,
+          score,
+          hitKeys: hits,
+          reason: fringeRecipeReason(recipe, hits, cuisineScore),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }
+
+  function fringeRecipeReason(recipe, hits, cuisineScore) {
+    if (hits.length) return `Matches: ${formatIngredientList(hits, 3)}`;
+    if (cuisineScore > 0) return `Fits your ${CUISINE_DISPLAY[recipe.cuisine] || recipe.cuisine} direction`;
+    return "A controlled edge pick with no known hard pass";
   }
 
   function suggestSharedRestaurants(a, b) {
@@ -1711,11 +1953,12 @@
     if (!profile) return renderSetup();
 
     const daylist = generateDaylist(profile);
-    const adventure = adventureScore(profile);
+    const adventure = adventureBreakdown(profile);
     const narrative = generateNarrative(profile);
-    const affinities = cuisineAffinities(profile);
+    const cuisineEvidence = buildCuisineEvidence(profile);
     const restaurants = suggestRestaurants(profile);
     const dishes = suggestDishes(profile);
+    const fringeRecipes = suggestFringeRecipes(profile);
     const taste = tasteSignature(profile);
     const liked = topResponses(profile, (id, v) => typeof v === "number" && v > 0).slice(0, 10);
     const disliked = topResponses(profile, (id, v) => typeof v === "number" && v < 0).slice(0, 6);
@@ -1728,9 +1971,20 @@
           <h2>${esc(daylist)}</h2>
           <p>${esc(narrative)}</p>
         </div>
-        <div class="score-dial">
-          <span>${adventure}</span>
-          <small>adventure</small>
+        <div class="score-card">
+          <div class="score-dial">
+            <span>${adventure.score}</span>
+            <small>adventure score</small>
+          </div>
+          <div class="score-copy">
+            <strong>Weighted edge score</strong>
+            <span>${esc(adventureSummary(adventure))}</span>
+            <div class="score-math" aria-label="Adventure score evidence">
+              <span>${adventure.accepted} accepted</span>
+              <span>${adventure.neutral} neutral</span>
+              <span>${adventure.passed} passed</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1738,12 +1992,12 @@
         <div class="panel panel-wide">
           <div class="panel-heading">
             <div>
-              <div class="section-label">Cuisine pull</div>
-              <h3>Where your answers cluster</h3>
-              <p class="panel-hint">Broad likes set the direction; later branches can strengthen or soften it.</p>
+              <div class="section-label">Cuisine compass</div>
+              <h3>Regional evidence</h3>
+              <p class="panel-hint">This combines direct region answers with later recipe-cluster and ingredient-neighborhood evidence.</p>
             </div>
           </div>
-          ${renderCuisineBars(affinities)}
+          ${renderCuisineEvidence(cuisineEvidence)}
         </div>
 
         <div class="panel">
@@ -1768,6 +2022,15 @@
           <p class="panel-hint">Dishes appear when your yes answers cover their key ingredients.</p>
           <div class="dish-stack">
             ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
+          </div>
+        </div>
+
+        <div class="panel panel-wide panel-full">
+          <div class="section-label">Fringe recipes</div>
+          <h3>Top 3 edge tests</h3>
+          <p class="panel-hint">These push the boundary without using ingredients you already rejected.</p>
+          <div class="fringe-list">
+            ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
           </div>
         </div>
 
@@ -2010,33 +2273,58 @@
   function renderQuizTree(quiz) {
     const end = Math.min(quiz.queue.length, quiz.pos + 1);
     const cards = quiz.queue.slice(0, end);
-    const visible = cards.slice(-14);
+    const visible = cards.slice(-8);
     const hiddenCount = cards.length - visible.length;
-    const lines = [];
+    const nodes = [];
 
-    lines.push("Taste scan");
-    if (hiddenCount > 0) lines.push(`|-- ${hiddenCount} earlier branches`);
+    nodes.push(`
+      <li class="tree-node root">
+        <span class="tree-marker"></span>
+        <div class="tree-copy">
+          <strong>Taste scan</strong>
+          <small>${quiz.pos + 1} of ${QUIZ_TARGET}</small>
+        </div>
+      </li>
+    `);
+
+    if (hiddenCount > 0) {
+      nodes.push(`
+        <li class="tree-node collapsed">
+          <span class="tree-marker"></span>
+          <div class="tree-copy">
+            <strong>${hiddenCount} earlier branches</strong>
+            <small>Kept out of view</small>
+          </div>
+        </li>
+      `);
+    }
 
     visible.forEach((card, offset) => {
       const index = hiddenCount + offset;
       const isActive = index === quiz.pos;
       const value = quiz.responses[card.id];
-      const state = treeState(value, isActive);
-      const prefix = card.type === "ingredient-probe" ? "|   |--" : "|--";
-      const label = `${prefix} [${state.mark}] ${card.label}`;
-      lines.push(label);
-      if (card.parentLabel) lines.push(`|   |   from: ${card.parentLabel}`);
+      const nodeState = treeState(value, isActive);
+      nodes.push(`
+        <li class="tree-node ${nodeState.key} ${card.type === "ingredient-probe" ? "branch" : ""}">
+          <span class="tree-marker">${esc(nodeState.short)}</span>
+          <div class="tree-copy">
+            <strong>${esc(card.label)}</strong>
+            <small>${esc(card.parentLabel ? "from " + card.parentLabel : cardTypeLabel(card))}</small>
+          </div>
+        </li>
+      `);
     });
 
-    return `<pre class="path-tree" aria-label="Taste path tree">${esc(lines.join("\n"))}</pre>`;
+    return `<ol class="path-tree" aria-label="Taste path tree">${nodes.join("")}</ol>`;
   }
 
   function treeState(value, isActive) {
-    if (isActive) return { mark: "now" };
-    if (value === "unknown") return { mark: "new" };
-    if (typeof value === "number" && value > 0) return { mark: "yes" };
-    if (typeof value === "number" && value < 0) return { mark: "no " };
-    return { mark: "ok " };
+    if (isActive) return { key: "active", short: "now" };
+    if (value === "unknown") return { key: "unknown", short: "try" };
+    if (typeof value === "number" && value > 0) return { key: "yes", short: "yes" };
+    if (typeof value === "number" && value < 0) return { key: "no", short: "no" };
+    if (value === 0) return { key: "neutral", short: "mid" };
+    return { key: "pending", short: "" };
   }
 
   function quizResponseChips(quiz, filter, limit) {
@@ -2052,25 +2340,67 @@
     return `<span class="${className}">${esc(item.label)}</span>`;
   }
 
-  function renderCuisineBars(affinities) {
+  function adventureSummary(details) {
+    if (details.possible <= 0) {
+      return "Not enough divisive ingredient answers yet, so the score starts at 50.";
+    }
+    return `${formatEdgePoints(details.earned)} of ${formatEdgePoints(details.possible)} weighted edge points from ${details.tested} divisive ingredients.`;
+  }
+
+  function formatEdgePoints(value) {
+    const rounded = Math.round(value * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  }
+
+  function renderCuisineEvidence(rows) {
+    const ordered = [...rows].sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
     return `
-      <div class="bars">
-        ${CUISINES.map((c) => {
-          const value = affinities[c.id] || 0;
-          const width = Math.min(100, Math.abs(value) / 3 * 100);
-          const label = value > 0 ? "+" + value : String(value);
-          return `
-            <div class="bar-row">
-              <div class="bar-label">
-                <span class="bar-name">${esc(CUISINE_DISPLAY[c.id] || c.id)}</span>
-                <span class="bar-score">${esc(label)}</span>
-              </div>
-              <div class="bar-track"><div class="bar-fill ${value < 0 ? "negative" : ""}" style="width:${width}%"></div></div>
+      <div class="cuisine-evidence">
+        ${ordered.map((row) => `
+          <div class="cuisine-card ${cuisineTone(row)}">
+            <div class="cuisine-card-top">
+              <strong>${esc(row.label)}</strong>
+              <span>${esc(cuisineSignalLabel(row.score))}</span>
             </div>
-          `;
-        }).join("")}
+            <div class="signal-parts">
+              <span>Region: ${esc(answerLabel(row.direct))}</span>
+              <span>Clusters: ${esc(contributionLabel(row.cluster))}</span>
+              <span>Ingredients: ${esc(contributionLabel(row.ingredient))}</span>
+            </div>
+          </div>
+        `).join("")}
       </div>
     `;
+  }
+
+  function cuisineTone(row) {
+    if (row.score > 0.4) return "positive";
+    if (row.score < -0.4) return "negative";
+    return "neutral";
+  }
+
+  function cuisineSignalLabel(score) {
+    if (score >= 6) return "Strong pull";
+    if (score >= 2) return "Pull";
+    if (score > 0.4) return "Soft pull";
+    if (score <= -6) return "Strong pass";
+    if (score <= -2) return "Pass";
+    if (score < -0.4) return "Soft pass";
+    return "No clear pull";
+  }
+
+  function answerLabel(value) {
+    if (value == null) return "No answer";
+    const option = ANSWER_OPTIONS.find((item) => item.value === value);
+    return option ? option.label : String(value);
+  }
+
+  function contributionLabel(value) {
+    if (value >= 1) return "Support";
+    if (value > 0.1) return "Light support";
+    if (value <= -1) return "Push away";
+    if (value < -0.1) return "Light push away";
+    return "No signal";
   }
 
   function renderTasteBars(taste) {
@@ -2106,6 +2436,19 @@
       <div class="dish-card">
         <strong>${esc(d.dish)}</strong>
         <span>${esc(reason)}</span>
+      </div>
+    `;
+  }
+
+  function renderFringeRecipeCard(recipe) {
+    return `
+      <div class="fringe-card">
+        <div class="fringe-card-top">
+          <strong>${esc(recipe.title)}</strong>
+          <span>Edge ${recipe.fringe}/10</span>
+        </div>
+        <p>${esc(recipe.note)}</p>
+        <small>${esc(recipe.reason)}</small>
       </div>
     `;
   }
@@ -2341,10 +2684,53 @@
   }
 
   function copyToClipboard(text, successMsg) {
-    navigator.clipboard.writeText(text).then(
-      () => showToast(successMsg || "Copied!"),
-      () => showToast("Could not copy")
-    );
+    if (navigator.clipboard && window.isSecureContext) {
+      let settled = false;
+      const fallbackTimer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          copyToClipboardFallback(text, successMsg);
+        }
+      }, 700);
+      navigator.clipboard.writeText(text).then(
+        () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(fallbackTimer);
+          showToast(successMsg || "Copied!");
+        },
+        () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(fallbackTimer);
+          copyToClipboardFallback(text, successMsg);
+        }
+      );
+      return;
+    }
+    copyToClipboardFallback(text, successMsg);
+  }
+
+  function copyToClipboardFallback(text, successMsg) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-1000px";
+    textarea.style.left = "-1000px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    }
+
+    document.body.removeChild(textarea);
+    showToast(copied ? successMsg || "Copied!" : "Could not copy");
   }
 
   // ─── INIT ──────────────────────────────────────────────────────
