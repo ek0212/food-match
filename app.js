@@ -1977,7 +1977,7 @@
             <small>adventure score</small>
           </div>
           <div class="score-copy">
-            <strong>Weighted edge score</strong>
+            <strong>Adventure score</strong>
             <span>${esc(adventureSummary(adventure))}</span>
             <div class="score-math" aria-label="Adventure score evidence">
               <span>${adventure.accepted} accepted</span>
@@ -1993,8 +1993,7 @@
           <div class="panel-heading">
             <div>
               <div class="section-label">Cuisine compass</div>
-              <h3>Regional evidence</h3>
-              <p class="panel-hint">This combines direct region answers with later recipe-cluster and ingredient-neighborhood evidence.</p>
+              <h3>Regional evidence <button type="button" class="hint-icon" aria-label="More info" title="This combines direct region answers with later recipe-cluster and ingredient-neighborhood evidence.">?</button></h3>
             </div>
           </div>
           ${renderCuisineEvidence(cuisineEvidence)}
@@ -2002,15 +2001,13 @@
 
         <div class="panel">
           <div class="section-label">Taste spectrum</div>
-          <h3>Flavor center</h3>
-          <p class="panel-hint">This compresses many answers into the flavors most likely to matter.</p>
+          <h3>Flavor center <button type="button" class="hint-icon" aria-label="More info" title="This compresses many answers into the flavors most likely to matter.">?</button></h3>
           ${renderTasteBars(taste)}
         </div>
 
         <div class="panel panel-wide">
           <div class="section-label">Where to eat</div>
-          <h3>Restaurant fit</h3>
-          <p class="panel-hint">These places match the ingredients and regions you kept saying yes to.</p>
+          <h3>Restaurant fit <button type="button" class="hint-icon" aria-label="More info" title="These places match the ingredients and regions you kept saying yes to.">?</button></h3>
           <div class="recommendation-list">
             ${restaurants.length ? restaurants.slice(0, 5).map(renderRestaurantCard).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
           </div>
@@ -2018,8 +2015,7 @@
 
         <div class="panel">
           <div class="section-label">What to order</div>
-          <h3>Dish ideas</h3>
-          <p class="panel-hint">Dishes appear when your yes answers cover their key ingredients.</p>
+          <h3>Dish ideas <button type="button" class="hint-icon" aria-label="More info" title="Dishes appear when your yes answers cover their key ingredients.">?</button></h3>
           <div class="dish-stack">
             ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
           </div>
@@ -2027,8 +2023,7 @@
 
         <div class="panel panel-wide panel-full">
           <div class="section-label">Fringe recipes</div>
-          <h3>Top 3 edge tests</h3>
-          <p class="panel-hint">These push the boundary without using ingredients you already rejected.</p>
+          <h3>Try something new <button type="button" class="hint-icon" aria-label="More info" title="These push the boundary without using ingredients you already rejected.">?</button></h3>
           <div class="fringe-list">
             ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
           </div>
@@ -2036,16 +2031,17 @@
 
         <div class="panel panel-wide">
           <div class="section-label">Evidence</div>
-          <h3>Strong signals</h3>
-          <p class="panel-hint">These answers did the most work in shaping the suggestions.</p>
+          <h3>Strong signals <button type="button" class="hint-icon" aria-label="More info" title="These answers did the most work in shaping the suggestions.">?</button></h3>
           <div class="split-evidence">
             <div>
               <div class="subhead">Likes</div>
-              <div class="food-grid">${liked.length ? liked.map((f) => renderFoodTag(f)).join("") : `<span class="food-tag dim">No strong likes</span>`}</div>
+              <div class="food-grid">${liked.length ? liked.slice(0, 5).map((f) => renderFoodTag(f)).join("") : `<span class="food-tag dim">No strong likes</span>`}</div>
+              ${liked.length > 5 ? `<div class="food-grid extra" hidden>${liked.slice(5).map((f) => renderFoodTag(f)).join("")}</div><button type="button" class="link-toggle" data-toggle-target="extra">Show ${liked.length - 5} more</button>` : ""}
             </div>
             <div>
               <div class="subhead">Passes</div>
-              <div class="food-grid">${disliked.length ? disliked.map((f) => renderFoodTag(f, "conflict")).join("") : `<span class="food-tag dim">No hard passes</span>`}</div>
+              <div class="food-grid">${disliked.length ? disliked.slice(0, 5).map((f) => renderFoodTag(f, "conflict")).join("") : `<span class="food-tag dim">No hard passes</span>`}</div>
+              ${disliked.length > 5 ? `<div class="food-grid extra" hidden>${disliked.slice(5).map((f) => renderFoodTag(f, "conflict")).join("")}</div><button type="button" class="link-toggle" data-toggle-target="extra">Show ${disliked.length - 5} more</button>` : ""}
             </div>
           </div>
         </div>
@@ -2344,7 +2340,7 @@
     if (details.possible <= 0) {
       return "Not enough divisive ingredient answers yet, so the score starts at 50.";
     }
-    return `${formatEdgePoints(details.earned)} of ${formatEdgePoints(details.possible)} weighted edge points from ${details.tested} divisive ingredients.`;
+    return `${formatEdgePoints(details.earned)} of ${formatEdgePoints(details.possible)} adventure points from ${details.tested} divisive ingredients.`;
   }
 
   function formatEdgePoints(value) {
@@ -2354,21 +2350,30 @@
 
   function renderCuisineEvidence(rows) {
     const ordered = [...rows].sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+    const renderCard = (row) => {
+      const regionLabel = answerLabel(row.direct);
+      const clusterLabel = contributionLabel(row.cluster);
+      const ingredientLabel = contributionLabel(row.ingredient);
+      const parts = [];
+      if (regionLabel !== "No signal") parts.push(`<span>Region: ${esc(regionLabel)}</span>`);
+      if (clusterLabel !== "No signal") parts.push(`<span>Clusters: ${esc(clusterLabel)}</span>`);
+      if (ingredientLabel !== "No signal") parts.push(`<span>Ingredients: ${esc(ingredientLabel)}</span>`);
+      return `
+        <div class="cuisine-card ${cuisineTone(row)}">
+          <div class="cuisine-card-top">
+            <strong>${esc(row.label)}</strong>
+            <span>${esc(cuisineSignalLabel(row.score))}</span>
+          </div>
+          ${parts.length ? `<div class="signal-parts">${parts.join("")}</div>` : ""}
+        </div>
+      `;
+    };
+    const strong = ordered.filter((row) => cuisineSignalLabel(row.score) !== "No clear pull");
+    const weak = ordered.filter((row) => cuisineSignalLabel(row.score) === "No clear pull");
     return `
       <div class="cuisine-evidence">
-        ${ordered.map((row) => `
-          <div class="cuisine-card ${cuisineTone(row)}">
-            <div class="cuisine-card-top">
-              <strong>${esc(row.label)}</strong>
-              <span>${esc(cuisineSignalLabel(row.score))}</span>
-            </div>
-            <div class="signal-parts">
-              <span>Region: ${esc(answerLabel(row.direct))}</span>
-              <span>Clusters: ${esc(contributionLabel(row.cluster))}</span>
-              <span>Ingredients: ${esc(contributionLabel(row.ingredient))}</span>
-            </div>
-          </div>
-        `).join("")}
+        ${strong.map(renderCard).join("")}
+        ${weak.length ? `<div class="cuisine-weak" hidden>${weak.map(renderCard).join("")}</div><button type="button" class="link-toggle" data-toggle-target="cuisine-weak">Show ${weak.length} more</button>` : ""}
       </div>
     `;
   }
@@ -2405,7 +2410,9 @@
 
   function renderTasteBars(taste) {
     const rows = Object.entries(taste)
+      .filter(([, value]) => value !== 0)
       .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
       .map(([key, value]) => `
         <div class="taste-row">
           <span>${esc(TASTE_DIMENSION_LABELS[key] || key)}</span>
@@ -2417,13 +2424,11 @@
   }
 
   function renderRestaurantCard(r) {
-    const reason = r.hitKeys && r.hitKeys.length
-      ? `Key matches: ${formatIngredientList(r.hitKeys, 4)}`
-      : "Key match: cuisine direction";
+    const hasHits = r.hitKeys && r.hitKeys.length;
     return `
       <div class="rest-card">
         <div class="rest-title"><strong>${esc(r.name)}</strong></div>
-        <div class="match-reason">${esc(reason)}</div>
+        ${hasHits ? `<div class="match-reason">${esc(`Key matches: ${formatIngredientList(r.hitKeys, 4)}`)}</div>` : ""}
       </div>
     `;
   }
@@ -2435,7 +2440,7 @@
     return `
       <div class="dish-card">
         <strong>${esc(d.dish)}</strong>
-        <span>${esc(reason)}</span>
+        <span class="dish-based">${esc(reason)}</span>
       </div>
     `;
   }
@@ -2445,7 +2450,7 @@
       <div class="fringe-card">
         <div class="fringe-card-top">
           <strong>${esc(recipe.title)}</strong>
-          <span>Edge ${recipe.fringe}/10</span>
+          <span>Stretch ${recipe.fringe}/10</span>
         </div>
         <p>${esc(recipe.note)}</p>
         <small>${esc(recipe.reason)}</small>
@@ -2570,6 +2575,25 @@
         }
         if (action === "share-profile" && state.profile) {
           copyToClipboard(profileUrl(state.profile), "Profile link copied!");
+        }
+      });
+    });
+    document.querySelectorAll("[data-toggle-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetClass = btn.dataset.toggleTarget;
+        let sibling = btn.previousElementSibling;
+        while (sibling && !sibling.classList.contains(targetClass)) {
+          sibling = sibling.previousElementSibling;
+        }
+        if (!sibling) return;
+        const nowHidden = !sibling.hasAttribute("hidden");
+        if (nowHidden) {
+          sibling.setAttribute("hidden", "");
+          btn.textContent = btn.dataset.showLabel || btn.textContent;
+        } else {
+          if (!btn.dataset.showLabel) btn.dataset.showLabel = btn.textContent;
+          sibling.removeAttribute("hidden");
+          btn.textContent = "Hide";
         }
       });
     });

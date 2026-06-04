@@ -1550,3 +1550,41 @@ input[type="text"]::placeholder {
     min-width: 0;
   }
 }
+
+.hint-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  margin-left: 0.4em;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 0.7em;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0.5;
+  cursor: help;
+  vertical-align: middle;
+}
+.hint-icon:hover { opacity: 1; }
+
+.link-toggle {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85em;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.link-toggle:hover { opacity: 1; }
+
+.dish-based { font-size: 0.85em; opacity: 0.7; }
