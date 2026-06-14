@@ -14,14 +14,20 @@
   const DATASET_INGREDIENT_COUNT = 1790;
   const DATASET_MODE_COUNT = 150;
   const DATASET_EDGE_COUNT = "203,508";
+  const DATASET_TOTAL_RESOURCE_ROWS = "4,696";
+  const EPICURE_DATASET_URL = "https://huggingface.co/datasets/Kaikaku/epicure-corpus-resources";
   const EPICURE_PAPER_URL = "https://arxiv.org/abs/2605.22391";
   const EPICURE_PAPER_TITLE = "Epicure: Navigating the Emergent Geometry of Food Ingredient Embeddings";
+  const EPICURE_HELD_BACK_ASSETS = [
+    { label: "The full recipe pages", detail: "The researchers counted patterns from 4.14M recipes, but the recipe text is not included." },
+    { label: "The giant ingredient web", detail: "The public page tells us how big the web is, but not every connection is downloadable yet." },
+    { label: "A region tag for every food", detail: "The dataset does not say that every ingredient belongs to one cuisine region." },
+    { label: "Hidden training pieces", detail: "Some internal training details are kept out of the public file because this app does not need them." },
+  ];
+  const INTRO_STEP_COUNT = 3;
   const ANSWER_OPTIONS = [
-    { value: -2, key: "1", label: "Hard no", tone: "r1" },
-    { value: -1, key: "2", label: "Pass", tone: "r2" },
-    { value: 0, key: "3", label: "Neutral", tone: "r3" },
-    { value: 1, key: "4", label: "Yes", tone: "r4" },
-    { value: 3, key: "5", label: "Crave it", tone: "r5" },
+    { value: 1, key: "1", label: "Yes", tone: "r4" },
+    { value: -1, key: "0", label: "No", tone: "r1" },
   ];
   const ADVENTURE_MIN_CONTROVERSY = 3;
   const ADVENTURE_CREDITS = {
@@ -289,6 +295,8 @@
     profile: null,
     compareProfiles: null,
     incomingProfile: null,
+    onboardingStep: 0,
+    onboardingComplete: false,
     toast: "",
   };
 
@@ -1456,6 +1464,149 @@
     .filter(Boolean);
   }
 
+  // ─── RESTAURANT SEARCH PROMPTS ─────────────────────────────────
+
+  function buildPersonalRestaurantPrompt(profile) {
+    const name = profile.name || "me";
+    const liked = promptResponseLabels(profile, (id, v) => typeof v === "number" && v > 0, 12);
+    const disliked = promptResponseLabels(profile, (id, v) => typeof v === "number" && v < 0, 8);
+    const cuisines = promptCuisineLabels(profile, 5);
+    const taste = promptTasteLabels(profile, 4);
+    const restaurants = suggestRestaurants(profile).slice(0, 6).map((r) => r.name);
+    const dishes = suggestDishes(profile).slice(0, 8).map((d) => d.dish);
+    const fringeRecipes = suggestFringeRecipes(profile).map((r) => r.title);
+    const restrictions = promptRestrictionLabels(profile);
+    const adventure = adventureBreakdown(profile);
+    const mapsQuery = buildMapsQuery([
+      "restaurants near me",
+      ...cuisines.slice(0, 3),
+      ...restaurants.slice(0, 2),
+      ...dishes.slice(0, 2),
+    ]);
+
+    const text = [
+      `I am looking for restaurants near me for ${name}. Use my current location in Google Maps or Ask Maps, then suggest specific places and explain why each one fits.`,
+      "",
+      "My strongest food signals:",
+      `- Cuisines or regions I seem pulled toward: ${formatPromptList(cuisines, "No clear region yet")}.`,
+      `- Foods and flavors I like: ${formatPromptList(liked, "No strong likes yet")}.`,
+      `- Flavor center: ${formatPromptList(taste, "No clear flavor center yet")}.`,
+      `- Foods I want to avoid or treat carefully: ${formatPromptList(disliked, "No hard passes captured")}.`,
+      `- Dietary boundaries: ${formatPromptList(restrictions, "No restrictions")}.`,
+      `- Adventure level: ${adventure.score}/100. ${adventureSummary(adventure)}`,
+      "",
+      "Things I am excited to try:",
+      `- Dish directions: ${formatPromptList(dishes, "Use the cuisine and ingredient signals instead")}.`,
+      `- Stretch picks if the restaurant is especially good: ${formatPromptList(fringeRecipes, "Keep recommendations familiar")}.`,
+      "",
+      "Restaurant search instructions:",
+      "- Prioritize places with recent good reviews, enough menu evidence, and dishes matching the signals above.",
+      "- Give me 5 nearby options, each with the specific dishes I should order.",
+      "- Avoid places where the likely menu leans heavily into my pass list.",
+      "- Include one safer familiar pick and one more adventurous pick.",
+      "- Return the answer in a table with restaurant name, why it fits, dishes to order, what to avoid, and Google Maps action.",
+    ].join("\n");
+
+    return { text, mapsQuery };
+  }
+
+  function buildCompatibilityRestaurantPrompt(a, b) {
+    const aName = a.name || "Person 1";
+    const bName = b.name || "Person 2";
+    const result = compareProfiles(a, b);
+    const sharedRestaurants = suggestSharedRestaurants(a, b).slice(0, 6).map((r) => r.name);
+    const sharedDishes = suggestSharedDishes(a, b).slice(0, 8).map((d) => d.dish);
+    const avoidDishes = suggestAvoidDishes(a, b).slice(0, 6).map((d) => d.dish);
+    const sharedLikes = result.sharedLikes.map((item) => item.label).slice(0, 12);
+    const conflicts = result.conflicts.map((item) => item.label).slice(0, 10);
+    const bridges = result.bridges.map((item) => item.label).slice(0, 10);
+    const aCuisines = promptCuisineLabels(a, 3);
+    const bCuisines = promptCuisineLabels(b, 3);
+    const mapsQuery = buildMapsQuery([
+      "restaurants near me for dinner",
+      ...sharedRestaurants.slice(0, 2),
+      ...sharedDishes.slice(0, 3),
+      ...aCuisines.slice(0, 1),
+      ...bCuisines.slice(0, 1),
+    ]);
+
+    const text = [
+      `Where should ${aName} and ${bName} go together? Use our current location in Google Maps or Ask Maps, then recommend restaurants that satisfy both profiles.`,
+      "",
+      "Shared fit:",
+      `- Match score: ${result.score}/100.`,
+      `- Things we both like or can safely build around: ${formatPromptList(sharedLikes, "No exact overlaps yet")}.`,
+      `- Shared dish directions: ${formatPromptList(sharedDishes, "Use cuisine and ingredient signals instead")}.`,
+      `- Restaurant categories already suggested by the matcher: ${formatPromptList(sharedRestaurants, "No confident shared restaurant category yet")}.`,
+      "",
+      "Individual pulls:",
+      `- ${aName}: ${formatPromptList(aCuisines, "No strong region yet")}.`,
+      `- ${bName}: ${formatPromptList(bCuisines, "No strong region yet")}.`,
+      "",
+      "Watch-outs:",
+      `- Direct conflicts: ${formatPromptList(conflicts, "No direct conflicts")}.`,
+      `- Risky dishes to avoid: ${formatPromptList(avoidDishes, "No risky dishes flagged")}.`,
+      `- Bridge foods one person can introduce to the other: ${formatPromptList(bridges, "No bridge foods yet")}.`,
+      "",
+      "Restaurant search instructions:",
+      "- Give us 5 nearby restaurants where both people have credible menu options.",
+      "- For each place, name what each person should order and one shared plate if possible.",
+      "- Penalize restaurants where a signature dish conflicts with either profile.",
+      "- Include one safe compromise and one interesting stretch option.",
+      "- Return the answer in a table with restaurant name, why it works for both, suggested orders, conflict risks, and Google Maps action.",
+    ].join("\n");
+
+    return { text, mapsQuery };
+  }
+
+  function promptResponseLabels(profile, filter, limit) {
+    return topResponses(profile, filter)
+      .map((item) => item.label)
+      .slice(0, limit);
+  }
+
+  function promptCuisineLabels(profile, limit) {
+    return buildCuisineEvidence(profile)
+      .filter((row) => row.score > 0.4)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map((row) => row.label);
+  }
+
+  function promptTasteLabels(profile, limit) {
+    const taste = tasteSignature(profile);
+    return Object.entries(taste)
+      .filter(([, value]) => value > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([key]) => TASTE_DIMENSION_LABELS[key] || key);
+  }
+
+  function promptRestrictionLabels(profile) {
+    const ids = profile.restrictions || [];
+    if (!ids.length) return [];
+    return ids
+      .map((id) => RESTRICTIONS.find((restriction) => restriction.id === id))
+      .filter(Boolean)
+      .map((restriction) => restriction.label);
+  }
+
+  function formatPromptList(items, fallback) {
+    return items.length ? items.join(", ") : fallback;
+  }
+
+  function buildMapsQuery(parts) {
+    return parts
+      .filter(Boolean)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function googleMapsSearchUrl(query) {
+    return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "restaurants near me");
+  }
+
   // ─── COMPARISON ────────────────────────────────────────────────
 
   function compareProfiles(a, b) {
@@ -1728,6 +1879,8 @@
     if (state.route === "profile") return renderResults();
     if (state.route === "compare") return renderCompare();
     if (state.route === "history") return renderHistory();
+    if (state.route === "corpus") return renderCorpus();
+    if (shouldShowOnboarding()) return renderOnboarding();
     if (!state.quiz) return renderSetup();
     if (state.quiz.phase === "done") return finishQuiz();
     if (state.quiz.phase === "setup") return renderSetup();
@@ -1735,9 +1888,11 @@
   }
 
   function shell(content) {
-    const onLanding = !state.quiz || state.quiz.phase === "setup";
+    const onLanding = shouldShowOnboarding() || !state.quiz || state.quiz.phase === "setup";
     const onHistory = state.route === "history";
+    const onCorpus = state.route === "corpus";
     const navButtons = [];
+    if (!onCorpus) navButtons.push(`<button data-action="corpus">Corpus</button>`);
     if (!onLanding) navButtons.push(`<button data-action="new-quiz">Retake</button>`);
     if (!onHistory) navButtons.push(`<button data-action="history">Profiles</button>`);
 
@@ -1755,12 +1910,368 @@
         </header>
         ${content}
         <footer class="footer">
-          Built on <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Epicure</a>, a recipe-context ingredient embedding map from 4.14M multilingual recipes.
+          Source: <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Epicure</a>
         </footer>
         ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ""}
       </div>
     `;
     bindGlobalActions();
+  }
+
+  function shouldShowOnboarding() {
+    return state.route === "quiz" && !state.onboardingComplete && !state.incomingProfile;
+  }
+
+  function renderOnboarding() {
+    const step = Math.max(0, Math.min(state.onboardingStep, INTRO_STEP_COUNT - 1));
+    shell(`
+      <section class="intro-layout" aria-label="Epicure introduction">
+        <div class="intro-main">
+          <div class="intro-progress" aria-label="Intro step ${step + 1} of ${INTRO_STEP_COUNT}">
+            ${Array.from({ length: INTRO_STEP_COUNT }, (_, i) => `
+              <span class="intro-dot ${i === step ? "active" : ""}"></span>
+            `).join("")}
+          </div>
+          ${introMain(step)}
+          <div class="intro-actions">
+            <button class="btn btn-primary" data-action="intro-next">${step === INTRO_STEP_COUNT - 1 ? "Start quiz" : "Next"}</button>
+            <button class="btn btn-quiet" data-action="intro-skip">Skip intro</button>
+          </div>
+        </div>
+        <aside class="intro-side">
+          ${introSide(step)}
+        </aside>
+      </section>
+    `);
+  }
+
+  function introMain(step) {
+    if (step === 1) {
+      return `
+        <div class="intro-copy">
+          <div class="eyebrow">What this screen shows</div>
+          <h2>A big recipe study becomes a small taste quiz.</h2>
+          <p>Epicure read millions of recipes and found foods that show up together. Food Match keeps the parts that can become normal quiz questions.</p>
+          <div class="intro-facts">
+            ${factRow(DATASET_INGREDIENT_COUNT.toLocaleString(), "ingredient names")}
+            ${factRow(DATASET_MODE_COUNT, "food groups")}
+            ${factRow(DATASET_EDGE_COUNT, "ingredient pairs")}
+          </div>
+        </div>
+      `;
+    }
+
+    if (step === 2) {
+      return `
+        <div class="intro-copy">
+          <div class="eyebrow">Welcome</div>
+          <h2>Food Match turns food patterns into a taste scan.</h2>
+          <p>The app asks a fast yes, no, or unsure question. Each answer moves the path tracker and decides which food neighborhood comes next.</p>
+          <div class="intro-facts">
+            ${factRow("35", "preference questions")}
+            ${factRow("3", "question layers")}
+            ${factRow("2", "profiles can be compared")}
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="intro-copy">
+        <div class="eyebrow">Why Food Match exists</div>
+        <h2>Food taste is more specific than cuisine labels.</h2>
+        <p>Two people can both say they like Japanese food and still disagree on seaweed, spice, tofu, or fermented flavors. Restaurant planning needs more detail than a cuisine checkbox.</p>
+        <p>Epicure gives Food Match a starting point: foods that tend to appear together in real recipes. The app turns those patterns into questions, then uses your answers to suggest dishes, restaurants, and shared plans.</p>
+      </div>
+    `;
+  }
+
+  function introSide(step) {
+    if (step === 1) {
+      return `
+        <div>
+          <div class="section-label">Coverage snapshot</div>
+          <h3>Provenance is useful, but uneven.</h3>
+        </div>
+        ${renderProvenanceBars()}
+        <p class="intro-note">Food Match layers curated cuisine, dish, and ingredient logic over Epicure so smaller regions do not depend on one raw signal.</p>
+      `;
+    }
+
+    if (step === 2) {
+      return `
+        <div>
+          <div class="section-label">What happens next</div>
+          <h3>Broad answer, branch, boundary check.</h3>
+        </div>
+        <div class="flow-stack">
+          ${flowStep("1", "Press 1 for yes, 0 for no, or Space for unsure.")}
+          ${flowStep("2", "Watch the path tracker grow as the quiz branches.")}
+          ${flowStep("3", "Answer sharper ingredient probes at the edges.")}
+          ${flowStep("4", "Get restaurant, dish, and shared-match ideas.")}
+        </div>
+      `;
+    }
+
+    return `
+      <div>
+        <div class="section-label">How Epicure becomes Food Match</div>
+        <h3>From recipe data to quiz questions.</h3>
+      </div>
+      ${renderEpicureAnalysisBoard()}
+      <p class="intro-note">The motivation is practical: ask fewer, better food questions so the app can recommend what to try and where two people overlap.</p>
+    `;
+  }
+
+  function factRow(value, label) {
+    return `
+      <div class="intro-fact">
+        <strong>${esc(value)}</strong>
+        <span>${esc(label)}</span>
+      </div>
+    `;
+  }
+
+  function flowStep(value, label) {
+    return `
+      <div class="flow-step">
+        <b>${esc(value)}</b>
+        <span>${esc(label)}</span>
+      </div>
+    `;
+  }
+
+  function renderEpicureAnalysisBoard() {
+    return `
+      <div class="analysis-board" aria-label="Epicure dataset visual analysis">
+        ${renderDatasetFunnel()}
+        ${renderModeKindMix()}
+        ${renderModeSizeHistogram()}
+      </div>
+    `;
+  }
+
+  function renderDatasetFunnel() {
+    const rows = [
+      { value: "4.14M", label: "recipes Epicure read", width: 100 },
+      { value: DATASET_EDGE_COUNT, label: "ingredient pairs found", width: 78 },
+      { value: DATASET_INGREDIENT_COUNT.toLocaleString(), label: "ingredient names after cleanup", width: 50 },
+      { value: DATASET_MODE_COUNT, label: "food groups learned", width: 32 },
+      { value: epicure.quizModes.length, label: "quiz-friendly groups", width: 22 },
+    ];
+
+    return `
+      <div class="analysis-card analysis-funnel">
+        <div class="analysis-card-top">
+          <span>From raw recipes</span>
+          <b>To quiz questions</b>
+        </div>
+        <p class="analysis-caption">The research starts with recipes. The app keeps the useful groups that can be asked as taste questions.</p>
+        ${rows.map((row) => `
+          <div class="funnel-row" style="--w:${row.width}%">
+            <i></i>
+            <strong>${esc(row.value)}</strong>
+            <span>${esc(row.label)}</span>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderModeKindMix() {
+    const counts = epicure.modes.reduce((acc, mode) => {
+      acc[mode.kind] = (acc[mode.kind] || 0) + 1;
+      return acc;
+    }, {});
+    const total = epicure.modes.length || 1;
+    const rows = [
+      { id: "continuous", label: "flavor patterns", count: counts.continuous || 0 },
+      { id: "factor", label: "recipe patterns", count: counts.factor || 0 },
+      { id: "binary", label: "ingredient groups", count: counts.binary || 0 },
+    ];
+
+    return `
+      <div class="analysis-card">
+        <div class="analysis-card-top">
+          <span>Kinds of quiz clues</span>
+          <b>${total} groups</b>
+        </div>
+        <p class="analysis-caption">These are the kinds of food patterns Epicure found. Food Match mixes them so the quiz can ask about flavor, dishes, and ingredients.</p>
+        <div class="kind-stack">
+          ${rows.map((row) => `<i class="${row.id}" style="--w:${Math.round((row.count / total) * 100)}%"></i>`).join("")}
+        </div>
+        <div class="kind-legend">
+          ${rows.map((row) => `
+            <span><i class="${row.id}"></i>${esc(row.count)} ${esc(row.label)}</span>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderModeSizeHistogram() {
+    const bins = [
+      { label: "18-49", min: 18, max: 49, count: 0 },
+      { label: "50-99", min: 50, max: 99, count: 0 },
+      { label: "100-149", min: 100, max: 149, count: 0 },
+      { label: "150-199", min: 150, max: 199, count: 0 },
+      { label: "200+", min: 200, max: Infinity, count: 0 },
+    ];
+    epicure.modes.forEach((mode) => {
+      const bin = bins.find((row) => mode.n >= row.min && mode.n <= row.max);
+      if (bin) bin.count++;
+    });
+    const max = Math.max(1, ...bins.map((row) => row.count));
+
+    return `
+      <div class="analysis-card">
+        <div class="analysis-card-top">
+          <span>How big the food groups are</span>
+          <b>number of groups</b>
+        </div>
+        <p class="analysis-caption">Most groups contain dozens of related ingredients. Smaller groups feel specific, bigger groups feel broader.</p>
+        <div class="histogram">
+          ${bins.map((bin) => `
+            <div class="histogram-bar">
+              <i style="--h:${Math.round((bin.count / max) * 100)}%"></i>
+              <strong>${bin.count}</strong>
+              <span>${esc(bin.label)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderProvenanceBars() {
+    const entries = Object.entries(epicure.cuisineProvenance || {})
+      .map(([id, modes]) => ({
+        id,
+        label: CUISINE_DISPLAY[id] || id.replace(/_/g, " "),
+        count: modes.length,
+      }))
+      .sort((a, b) => b.count - a.count);
+    const max = Math.max(1, ...entries.map((row) => row.count));
+
+    return `
+      <div class="provenance-bars">
+        ${entries.map((row) => `
+          <div class="provenance-row">
+            <span>${esc(row.label)}</span>
+            <i style="--bar:${Math.round((row.count / max) * 100)}%"></i>
+            <b>${row.count}</b>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderCorpus() {
+    shell(`
+      <section class="corpus-hero" aria-labelledby="corpus-title">
+        <div>
+          <div class="eyebrow">How Food Match learned</div>
+          <h2 id="corpus-title">Recipes became a taste map</h2>
+          <div class="corpus-visual-flow" aria-label="Recipes to taste quiz">
+            ${visualFlowStep("\u{1F4DA}", "Recipes")}
+            ${visualFlowArrow()}
+            ${visualFlowStep("\u{1F9ED}", "Food map")}
+            ${visualFlowArrow()}
+            ${visualFlowStep("\u{1F4AC}", "Quiz cards")}
+          </div>
+          <div class="corpus-actions">
+            <a class="btn btn-primary" href="${EPICURE_DATASET_URL}" target="_blank" rel="noopener">Open source data</a>
+            <a class="btn" href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Open research paper</a>
+          </div>
+        </div>
+        <div class="corpus-metrics" aria-label="Dataset scale">
+          ${corpusMetric(DATASET_INGREDIENT_COUNT.toLocaleString(), "food names")}
+          ${corpusMetric(DATASET_MODE_COUNT, "food groups")}
+          ${corpusMetric(DATASET_EDGE_COUNT, "pairings")}
+        </div>
+      </section>
+
+      <section class="corpus-grid">
+        <div class="panel panel-wide">
+          <div class="section-label">The source</div>
+          <h3>Three useful pieces</h3>
+          <div class="source-tiles" aria-label="Source data summary">
+            ${sourceTile("\u{1FAD2}", "Food names", "1,790")}
+            ${sourceTile("\u{1F9E9}", "Food groups", "150")}
+            ${sourceTile("\u2713", "Checked", "outside data")}
+          </div>
+        </div>
+
+        <div class="panel panel-wide">
+          <div class="section-label">The quiz</div>
+          <h3>Each answer branches the quiz</h3>
+          ${renderQuizFlowVisual()}
+        </div>
+
+        <div class="panel">
+          <div class="section-label">The final step</div>
+          <h3>The map suggests, you choose</h3>
+          <div class="choice-strip" aria-label="User choice">
+            <span class="map-chip">\u{1F9ED} map</span>
+            <span class="choice-arrow">-&gt;</span>
+            <span class="yes">\u2713 yes</span>
+            <span class="no">\u00D7 no</span>
+          </div>
+        </div>
+      </section>
+    `);
+  }
+
+  function visualFlowStep(icon, label) {
+    return `
+      <span class="visual-flow-step">
+        <b>${esc(icon)}</b>
+        <small>${esc(label)}</small>
+      </span>
+    `;
+  }
+
+  function visualFlowArrow() {
+    return `<i class="visual-flow-arrow">-&gt;</i>`;
+  }
+
+  function corpusMetric(value, label) {
+    return `
+      <span class="corpus-metric">
+        <strong>${esc(value)}</strong>
+        <small>${esc(label)}</small>
+      </span>
+    `;
+  }
+
+  function sourceTile(icon, label, value) {
+    return `
+      <div class="source-tile">
+        <b>${esc(icon)}</b>
+        <strong>${esc(value)}</strong>
+        <span>${esc(label)}</span>
+      </div>
+    `;
+  }
+
+  function renderQuizFlowVisual() {
+    return `
+      <div class="quiz-flow-visual" aria-label="Taste quiz branching example">
+        <div class="quiz-node start">
+          <b>\u{1F4DD}</b>
+          <strong>Your answer</strong>
+        </div>
+        <div class="quiz-branches">
+          <span>nearby food</span>
+          <span>nearby flavor</span>
+          <span>nearby dish</span>
+        </div>
+        <div class="quiz-outcomes">
+          <span class="yes">yes -> show more</span>
+          <span class="no">no -> avoid</span>
+        </div>
+      </div>
+    `;
   }
 
   function renderSetup() {
@@ -1785,8 +2296,8 @@
 
           <div class="science-note" aria-label="Research basis">
             <div class="section-label">Research basis</div>
-            <p><strong>Epicure</strong> is a 2026 ingredient-embedding study that normalizes 4.14M recipes into 1,790 canonical ingredients.</p>
-            <p>Food Match follows the Cooc view: a recipe co-occurrence graph where nearby ingredients are linked by how cooks actually combine them.</p>
+            <p><strong>Epicure</strong> is a 2026 ingredient-embedding study that turns 4.14M recipes into 1,790 clean ingredient names.</p>
+            <p>Food Match uses the recipe-pairing view: ingredients are linked when cooks often use them together.</p>
             <p>That makes the quiz a walk through learned ingredient neighborhoods, not a fixed cuisine checklist.</p>
             <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">${esc(EPICURE_PAPER_TITLE)}</a>
           </div>
@@ -1880,7 +2391,7 @@
             `).join("")}
           </div>
           <div class="skip-row">
-            <button class="btn btn-skip" data-answer="unknown"><kbd>0</kbd><span>Haven't tried it</span></button>
+            <button class="btn btn-skip" data-answer="unknown"><kbd>Space</kbd><span>Unsure</span></button>
           </div>
         </section>
 
@@ -1922,16 +2433,19 @@
     saveProfile(profile);
     state.profile = profile;
 
-    const topicCount = quiz.queue.filter((c, i) => i < quiz.pos && c.type !== "ingredient-probe").length;
     const probeCount = quiz.queue.filter((c, i) => i < quiz.pos && c.type === "ingredient-probe").length;
     const counts = quizCounts(quiz);
+    const answerCount = Object.keys(quiz.responses).length;
 
     shell(`
       <section class="done-panel">
-        <div class="eyebrow">Profile ready</div>
-        <h2>${topicCount} signals mapped</h2>
+        <div class="eyebrow">Done</div>
+        <h2>${answerCount} answers mapped</h2>
         <p>${counts.likes} yes, ${counts.dislikes} no${probeCount ? `, ${probeCount} follow-up checks` : ""}.</p>
-        <button class="btn btn-primary mt-16" data-action="show-results">See results</button>
+        <div class="complete-tracker" aria-label="Completed taste path">
+          ${renderCompleteTracker(quiz)}
+        </div>
+        <button class="btn btn-primary mt-16" data-action="show-results">Scroll to analysis</button>
       </section>
     `);
 
@@ -1959,6 +2473,7 @@
     const restaurants = suggestRestaurants(profile);
     const dishes = suggestDishes(profile);
     const fringeRecipes = suggestFringeRecipes(profile);
+    const restaurantPrompt = buildPersonalRestaurantPrompt(profile);
     const taste = tasteSignature(profile);
     const liked = topResponses(profile, (id, v) => typeof v === "number" && v > 0).slice(0, 10);
     const disliked = topResponses(profile, (id, v) => typeof v === "number" && v < 0).slice(0, 6);
@@ -2011,6 +2526,13 @@
           <div class="recommendation-list">
             ${restaurants.length ? restaurants.slice(0, 5).map(renderRestaurantCard).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
           </div>
+        </div>
+
+        <div class="panel panel-wide panel-full prompt-panel">
+          <div class="section-label">Restaurant search prompt</div>
+          <h3>Find places near me</h3>
+          <p class="panel-hint">Copy this into Google Maps, Ask Maps, ChatGPT, or another local search tool.</p>
+          ${renderPromptCard("personal-restaurant-prompt", restaurantPrompt.text, restaurantPrompt.mapsQuery)}
         </div>
 
         <div class="panel">
@@ -2071,6 +2593,7 @@
     const sharedRests = suggestSharedRestaurants(a, b);
     const sharedDishes = suggestSharedDishes(a, b);
     const avoidDishes = suggestAvoidDishes(a, b);
+    const sharedPrompt = buildCompatibilityRestaurantPrompt(a, b);
 
     shell(`
       <section class="compare-hero">
@@ -2081,7 +2604,8 @@
         </div>
         <div class="score-dial">
           <span>${result.score}</span>
-          <small>match</small>
+          <small>compatibility score</small>
+          <em>0-100 from shared likes minus conflicts</em>
         </div>
       </section>
 
@@ -2102,6 +2626,13 @@
           <div class="dish-stack">
             ${sharedDishes.length ? sharedDishes.slice(0, 8).map(renderDishCard).join("") : `<div class="empty-state">No shared dish match yet.</div>`}
           </div>
+        </div>
+
+        <div class="panel panel-wide panel-full prompt-panel">
+          <div class="section-label">Shared search prompt</div>
+          <h3>Where should we go together?</h3>
+          <p class="panel-hint">Copy this into Google Maps, Ask Maps, ChatGPT, or another local search tool.</p>
+          ${renderPromptCard("compatibility-restaurant-prompt", sharedPrompt.text, sharedPrompt.mapsQuery)}
         </div>
 
         <div class="panel panel-wide">
@@ -2206,7 +2737,7 @@
 
   function phaseLabel(phase) {
     if (phase === "cuisines") return "Cuisine compass";
-    if (phase === "modes") return "Recipe clusters";
+    if (phase === "modes") return "Recipe neighborhoods";
     if (phase === "ingredients") return "Boundary check";
     return "Taste scan";
   }
@@ -2314,6 +2845,27 @@
     return `<ol class="path-tree" aria-label="Taste path tree">${nodes.join("")}</ol>`;
   }
 
+  function renderCompleteTracker(quiz) {
+    const answeredCards = quiz.queue
+      .slice(0, quiz.pos)
+      .filter((card) => quiz.responses[card.id] !== undefined)
+      .slice(-10);
+
+    return `
+      <ol>
+        ${answeredCards.map((card, index) => {
+          const stateInfo = treeState(quiz.responses[card.id], false);
+          return `
+            <li class="${stateInfo.key}">
+              <span>${index + 1}</span>
+              <strong>${esc(card.label)}</strong>
+            </li>
+          `;
+        }).join("")}
+      </ol>
+    `;
+  }
+
   function treeState(value, isActive) {
     if (isActive) return { key: "active", short: "now" };
     if (value === "unknown") return { key: "unknown", short: "try" };
@@ -2397,6 +2949,12 @@
   function answerLabel(value) {
     if (value == null) return "No answer";
     const option = ANSWER_OPTIONS.find((item) => item.value === value);
+    const legacyLabels = {
+      "-2": "Hard no",
+      0: "Neutral",
+      3: "Crave it",
+    };
+    if (legacyLabels[value] != null) return legacyLabels[value];
     return option ? option.label : String(value);
   }
 
@@ -2458,6 +3016,18 @@
     `;
   }
 
+  function renderPromptCard(id, promptText, mapsQuery) {
+    return `
+      <div class="prompt-card">
+        <pre id="${esc(id)}" class="prompt-text">${esc(promptText)}</pre>
+        <div class="prompt-actions">
+          <button class="btn btn-primary" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy prompt</button>
+          <a class="btn" href="${esc(googleMapsSearchUrl(mapsQuery))}" target="_blank" rel="noopener">Open Google Maps search</a>
+        </div>
+      </div>
+    `;
+  }
+
   function formatIngredientList(keys, limit) {
     return keys.slice(0, limit).map(displayName).join(", ");
   }
@@ -2465,33 +3035,59 @@
   // ─── EVENT BINDING ─────────────────────────────────────────────
 
   function bindGlobalActions() {
-    document.querySelectorAll("[data-action]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const action = el.dataset.action;
-        if (action === "home") {
-          state.quiz = null;
-          state.route = "quiz";
-          state.incomingProfile = null;
-          state.compareProfiles = null;
-          state.profile = null;
-          history.replaceState(null, "", baseUrl());
-          render();
+    app.onclick = (event) => {
+      if (!(event.target instanceof Element)) return;
+      const el = event.target.closest("[data-action]");
+      if (!el || !app.contains(el)) return;
+
+      const action = el.dataset.action;
+      if (action === "home") {
+        state.quiz = null;
+        state.route = "quiz";
+        state.incomingProfile = null;
+        state.compareProfiles = null;
+        state.profile = null;
+        history.replaceState(null, "", baseUrl());
+        render();
+      }
+      if (action === "intro-next") {
+        if (state.onboardingStep < INTRO_STEP_COUNT - 1) {
+          state.onboardingStep++;
+        } else {
+          state.onboardingComplete = true;
+          state.onboardingStep = INTRO_STEP_COUNT;
         }
-        if (action === "new-quiz") {
-          state.quiz = null;
-          state.route = "quiz";
-          state.incomingProfile = null;
-          state.compareProfiles = null;
-          state.profile = null;
-          history.replaceState(null, "", baseUrl());
-          render();
-        }
-        if (action === "history") {
-          state.route = "history";
-          render();
-        }
-      });
-    });
+        render();
+      }
+      if (action === "intro-skip") {
+        state.onboardingComplete = true;
+        state.onboardingStep = INTRO_STEP_COUNT;
+        render();
+      }
+      if (action === "new-quiz") {
+        state.quiz = null;
+        state.route = "quiz";
+        state.incomingProfile = null;
+        state.compareProfiles = null;
+        state.profile = null;
+        state.onboardingComplete = true;
+        state.onboardingStep = INTRO_STEP_COUNT;
+        history.replaceState(null, "", baseUrl());
+        render();
+      }
+      if (action === "history") {
+        state.route = "history";
+        render();
+      }
+      if (action === "corpus") {
+        state.route = "corpus";
+        history.replaceState(null, "", baseUrl() + "#corpus");
+        render();
+      }
+      if (action === "copy-prompt") {
+        copyPromptFromButton(el);
+      }
+    };
   }
 
   function bindSetupEvents() {
@@ -2612,11 +3208,19 @@
           state.incomingProfile = null;
           state.compareProfiles = null;
           state.profile = null;
+          state.onboardingComplete = true;
+          state.onboardingStep = INTRO_STEP_COUNT;
           history.replaceState(null, "", baseUrl());
           render();
         }
       });
     });
+  }
+
+  function copyPromptFromButton(btn) {
+    const target = document.getElementById(btn.dataset.promptTarget);
+    if (!target) return;
+    copyToClipboardFallback(target.textContent || "", "Prompt copied!");
   }
 
   // ─── CARD INTERACTION ──────────────────────────────────────────
@@ -2638,12 +3242,9 @@
     function onKey(e) {
       if (!document.querySelector("[data-answer]")) return;
 
-      if (e.key === "1") { e.preventDefault(); handleAnswer(-2); }
-      else if (e.key === "2") { e.preventDefault(); handleAnswer(-1); }
-      else if (e.key === "3") { e.preventDefault(); handleAnswer(0); }
-      else if (e.key === "4") { e.preventDefault(); handleAnswer(1); }
-      else if (e.key === "5") { e.preventDefault(); handleAnswer(3); }
-      else if (e.key === "0" || e.key === "s") { e.preventDefault(); handleAnswer("unknown"); }
+      if (e.key === "1") { e.preventDefault(); handleAnswer(1); }
+      else if (e.key === "0") { e.preventDefault(); handleAnswer(-1); }
+      else if (e.key === " " || e.key === "Spacebar") { e.preventDefault(); handleAnswer("unknown"); }
     }
     document.addEventListener("keydown", onKey);
   }
@@ -2659,10 +3260,16 @@
     }
 
     try {
+      if (hash === "corpus") {
+        state.route = "corpus";
+        return render();
+      }
       if (hash.startsWith("take=")) {
         state.incomingProfile = decodePayload(hash.slice(5));
         state.quiz = newQuiz("", []);
         state.route = "quiz";
+        state.onboardingComplete = true;
+        state.onboardingStep = INTRO_STEP_COUNT;
         return render();
       }
       if (hash.startsWith("profile=")) {
