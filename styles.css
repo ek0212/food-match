@@ -1145,6 +1145,12 @@ input[type="text"]::placeholder {
   background: var(--line);
 }
 
+.tree-node.parent-context .tree-marker {
+  border-color: rgba(49, 95, 145, 0.3);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
 .tree-marker {
   position: relative;
   z-index: 1;
@@ -1640,6 +1646,10 @@ input[type="text"]::placeholder {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 14px;
+}
+
+.cuisine-weak {
+  display: contents;
 }
 
 .cuisine-card {

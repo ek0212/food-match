@@ -37,9 +37,36 @@
     1: 0.78,
     3: 1,
   };
+  const MODE_PROBE_SCAN_LIMIT = 60;
+  const MODE_PROBE_COUNTS = {
+    like: 3,
+    pass: 1,
+    unsure: 1,
+  };
   const CUISINE_DIRECT_WEIGHT = 2;
   const CUISINE_MODE_WEIGHT = 0.8;
   const CUISINE_INGREDIENT_WEIGHT = 0.25;
+  const INGREDIENT_ALIASES = {
+    bonito_flake: "bonito_flakes",
+    brie: "brie_cheese",
+    camembert: "camembert_cheese",
+    feta: "feta_cheese",
+    gruyere: "gruyere_cheese",
+    parmesan: "parmesan_cheese",
+    tripe: "offal",
+    za_atar: "zaatar",
+  };
+  const FEATURE_ALIASES = {
+    black_sesame_seed: "black_sesame",
+    bonito_flakes: "bonito_flake",
+    brie_cheese: "brie",
+    camembert_cheese: "camembert",
+    feta_cheese: "feta",
+    gruyere_cheese: "gruyere",
+    matcha_powder: "matcha",
+    parmesan_cheese: "parmesan",
+    zaatar: "za_atar",
+  };
   const app = document.getElementById("app");
 
   const CUISINES = [
@@ -77,6 +104,16 @@
     Latin_American: "\u{1F32E}",
     Western_Atlantic: "\u{1F354}",
     Japanese: "\u{1F363}",
+  };
+
+  const CUISINE_KEYWORDS = {
+    East_Asian: ["east asian", "east-asian", "chinese", "korean", "wok", "sichuan", "soy"],
+    Southeast_Asian: ["southeast asian", "thai", "vietnamese", "indonesian", "laksa", "lemongrass", "coconut"],
+    South_Asian: ["south asian", "south-asian", "indian", "masala", "curry", "dal", "tandoori"],
+    Mediterranean: ["mediterranean", "italian", "greek", "turkish", "middle eastern", "zaatar", "olive"],
+    Latin_American: ["latin american", "mexican", "tex-mex", "latin", "new world", "oaxacan", "chile"],
+    Western_Atlantic: ["western", "american", "european", "atlantic", "french", "british", "comfort", "cheese"],
+    Japanese: ["japanese", "dashi", "miso", "sushi", "ramen"],
   };
 
   const TASTE_DIMENSION_LABELS = {
@@ -446,8 +483,24 @@
       .join(" ");
   }
 
+  function canonicalIngredientKey(ingredient) {
+    return INGREDIENT_ALIASES[ingredient] || ingredient;
+  }
+
+  function featureForIngredient(ingredient) {
+    return FEAT[ingredient] || FEAT[FEATURE_ALIASES[ingredient]];
+  }
+
+  function recommendationKeyMatches(set, key) {
+    return set.has(key) || set.has(canonicalIngredientKey(key));
+  }
+
+  function isRecommendationKeyAllowed(key, restrictions) {
+    return isIngredientAllowed(canonicalIngredientKey(key), restrictions);
+  }
+
   function ingredientEmoji(ingredient) {
-    const f = FEAT[ingredient];
+    const f = featureForIngredient(ingredient);
     return f ? f[0] : fallbackIngredientEmoji(ingredient);
   }
 
@@ -484,7 +537,7 @@
   }
 
   function ingredientDesc(ingredient) {
-    const f = FEAT[ingredient];
+    const f = featureForIngredient(ingredient);
     if (f) return f[1];
     const modes = epicure.ingredientModes[ingredient];
     if (modes && modes.length) {
@@ -495,7 +548,7 @@
   }
 
   function ingredientControversy(ingredient) {
-    const f = FEAT[ingredient];
+    const f = featureForIngredient(ingredient);
     if (f) return f[2] || 0;
     const spec = epicure.ingredientSpecificity[ingredient] || 10;
     return Math.max(0, Math.min(8, Math.round(10 - spec)));
@@ -552,13 +605,12 @@
 
     if (card.type === "mode" && !quiz.probesInjected.has(card.modeId)) {
       quiz.probesInjected.add(card.modeId);
-      let probeCount;
-      if (value >= 3) probeCount = 3;
-      else if (value > 0) probeCount = 2;
-      else if (value === "unknown") probeCount = 1;
-      else probeCount = 1;
+      const answeredAfterThis = Object.keys(quiz.responses).length;
+      const remainingSlots = Math.max(0, QUIZ_TARGET - answeredAfterThis);
+      const probeCount = Math.min(modeProbeCount(value), remainingSlots);
+      const branchAnswer = branchAnswerLabel(value);
       const reason = value > 0 ? "You liked: " + card.label : value < 0 ? "Even though you passed on: " + card.label : "Related to: " + card.label;
-      const probes = selectProbesFromMode(card.modeId, probeCount, quiz, reason);
+      const probes = selectProbesFromMode(card.modeId, probeCount, quiz, reason, branchAnswer);
       quiz.queue.splice(quiz.pos + 1, 0, ...probes);
     }
 
@@ -602,6 +654,18 @@
         if (next.type === "ingredient") quiz.phase = "ingredients";
       }
     }
+  }
+
+  function modeProbeCount(value) {
+    if (typeof value === "number" && value > 0) return MODE_PROBE_COUNTS.like;
+    if (value === "unknown") return MODE_PROBE_COUNTS.unsure;
+    return MODE_PROBE_COUNTS.pass;
+  }
+
+  function branchAnswerLabel(value) {
+    if (typeof value === "number" && value > 0) return "yes branch";
+    if (typeof value === "number" && value < 0) return "no guardrail";
+    return "unsure branch";
   }
 
   function selectModeCards(quiz) {
@@ -662,16 +726,7 @@
     });
 
     const label = mode.label.toLowerCase();
-    const keywords = {
-      East_Asian: ["east asian", "chinese", "japanese", "korean", "east-asian", "wok"],
-      Southeast_Asian: ["southeast asian", "thai", "vietnamese", "indonesian"],
-      South_Asian: ["south asian", "indian", "south-asian"],
-      Mediterranean: ["mediterranean", "italian", "greek", "turkish"],
-      Latin_American: ["latin american", "mexican", "tex-mex", "latin", "new world"],
-      Western_Atlantic: ["western", "american", "european", "atlantic", "french", "british"],
-      Japanese: ["japanese", "dashi", "miso"],
-    };
-    Object.entries(keywords).forEach(([cuisine, kws]) => {
+    Object.entries(CUISINE_KEYWORDS).forEach(([cuisine, kws]) => {
       if (likedCuisines.has(cuisine) && kws.some((kw) => label.includes(kw))) {
         score += (cuisineScores[cuisine] || 1);
       }
@@ -859,15 +914,15 @@
     return match ? match[1] : null;
   }
 
-  function selectProbesFromMode(modeId, count, quiz, reason) {
+  function selectProbesFromMode(modeId, count, quiz, reason, branchAnswer) {
     const mode = epicure.modeById[modeId];
-    if (!mode) return [];
+    if (!mode || count <= 0) return [];
 
     const already = new Set(quiz.queue.map((c) => c.id));
     Object.keys(quiz.responses).forEach((k) => already.add(k));
 
     const candidates = mode.members
-      .slice(0, 30)
+      .slice(0, MODE_PROBE_SCAN_LIMIT)
       .map((ing, idx) => ({ ing, rank: idx }))
       .filter((c) => !already.has("i:" + c.ing))
       .filter((c) => isIngredientAllowed(c.ing, quiz.restrictions))
@@ -875,9 +930,11 @@
 
     const scored = candidates.map((c) => {
       let score = 0;
-      if (FEAT[c.ing]) score += 5;
-      score += ingredientControversy(c.ing);
-      score += Math.max(0, 10 - c.rank);
+      const specificity = epicure.ingredientSpecificity[c.ing] || 10;
+      if (featureForIngredient(c.ing)) score += 5;
+      score += ingredientControversy(c.ing) * 1.2;
+      score += Math.max(0, 8 - specificity) * 0.8;
+      score += Math.max(0, 20 - c.rank) * 0.35;
       return { ing: c.ing, score };
     });
 
@@ -889,6 +946,7 @@
       type: "ingredient-probe",
       parentId: "m:" + modeId,
       parentLabel: branchLabel,
+      parentAnswer: branchAnswer || null,
     }));
   }
 
@@ -946,6 +1004,7 @@
       context: context || null,
       parentId: opts.parentId || null,
       parentLabel: opts.parentLabel || null,
+      parentAnswer: opts.parentAnswer || null,
       topicKey: normalizeTopic(ingredient),
     };
   }
@@ -1002,9 +1061,14 @@
 
       if (id.startsWith("i:")) {
         const modes = epicure ? epicure.ingredientModes[id.slice(2)] || [] : [];
-        modes.slice(0, 3).forEach((modeId) => {
-          const mode = epicure ? epicure.modeById[modeId] : null;
-          distributeCuisineEvidence(rows, modeCuisineIds(mode), value, CUISINE_INGREDIENT_WEIGHT / 3, "ingredient");
+        const evidenceModes = modes
+          .map((modeId) => epicure ? epicure.modeById[modeId] : null)
+          .map((mode) => ({ mode, cuisineIds: modeCuisineIds(mode) }))
+          .filter((entry) => entry.cuisineIds.length)
+          .slice(0, 4);
+        const weight = evidenceModes.length ? CUISINE_INGREDIENT_WEIGHT / evidenceModes.length : 0;
+        evidenceModes.forEach((entry) => {
+          distributeCuisineEvidence(rows, entry.cuisineIds, value, weight, "ingredient");
         });
       }
     });
@@ -1031,7 +1095,16 @@
   function modeCuisineIds(mode) {
     if (!mode || !epicure) return [];
     const official = epicure.modeCuisines[mode.id] || [];
-    return [...new Set(official)];
+    const inferred = inferredCuisineIdsForMode(mode);
+    return [...new Set([...official, ...inferred])];
+  }
+
+  function inferredCuisineIdsForMode(mode) {
+    if (!mode) return [];
+    const text = `${mode.label} ${mode.members.slice(0, 24).join(" ")}`.toLowerCase();
+    return Object.entries(CUISINE_KEYWORDS)
+      .filter(([, keywords]) => keywords.some((keyword) => text.includes(keyword)))
+      .map(([cuisineId]) => cuisineId);
   }
 
   function roundSignal(value) {
@@ -1111,13 +1184,13 @@
       if (id.startsWith("i:") && typeof value === "number" && value > 0) {
         const ing = id.slice(2);
         const modes = epicure ? epicure.ingredientModes[ing] || [] : [];
-        modes.slice(0, 3).forEach((modeId) => {
-          const mode = epicure ? epicure.modeById[modeId] : null;
-          if (mode) {
-            const dim = propertyMap[mode.property];
-            if (dim) sig[dim] += value * 0.3;
-          }
-        });
+        modes
+          .map((modeId) => epicure ? epicure.modeById[modeId] : null)
+          .filter((mode) => mode && propertyMap[mode.property])
+          .slice(0, 4)
+          .forEach((mode) => {
+            sig[propertyMap[mode.property]] += value * 0.25;
+          });
       }
     });
 
@@ -1345,17 +1418,26 @@
     const liked = profileLikedIngredients(profile);
     const disliked = profileDislikedIngredients(profile);
     const affinities = cuisineAffinities(profile);
+    const restrictions = profile.restrictions || [];
 
     return RESTAURANTS.map((r) => {
+      const allowedKeys = r.keys.filter((key) => isRecommendationKeyAllowed(key, restrictions));
+      if (!allowedKeys.length) return null;
+
+      const blockedKeys = r.keys.filter((key) => !isRecommendationKeyAllowed(key, restrictions));
+      if (blockedKeys.length > allowedKeys.length) return null;
+
       let score = 0;
       r.cuisines.forEach((c) => { score += Math.max(0, affinities[c] || 0) * 2; });
       if (r.cuisines.length === 0) score += 1;
-      const hits = r.keys.filter((k) => liked.has(k));
-      const misses = r.keys.filter((k) => disliked.has(k));
+      const hits = allowedKeys.filter((k) => recommendationKeyMatches(liked, k));
+      const misses = allowedKeys.filter((k) => recommendationKeyMatches(disliked, k));
       score += hits.length * 3;
       score -= misses.length * 4;
+      score -= blockedKeys.length;
       return { ...r, score, hits: hits.length, hitKeys: hits, misses: misses.length, missKeys: misses };
     })
+    .filter(Boolean)
     .filter((r) => r.score > 1 && (r.hits >= 1 || r.cuisines.length > 0))
     .sort((a, b) => b.score - a.score);
   }
@@ -1364,10 +1446,12 @@
     const liked = profileLikedIngredients(profile);
     const disliked = profileDislikedIngredients(profile);
     const affinities = cuisineAffinities(profile);
+    const restrictions = profile.restrictions || [];
 
     return DISH_BANK.map((d) => {
-      const hits = d.triggers.filter((t) => liked.has(t));
-      const misses = d.triggers.filter((t) => disliked.has(t));
+      if (!d.triggers.every((key) => isRecommendationKeyAllowed(key, restrictions))) return null;
+      const hits = d.triggers.filter((t) => recommendationKeyMatches(liked, t));
+      const misses = d.triggers.filter((t) => recommendationKeyMatches(disliked, t));
       if (misses.length > 0 || hits.length === 0) return null;
       let score = hits.length * 3;
       score += Math.max(0, affinities[d.cuisine] || 0);
@@ -1386,11 +1470,11 @@
 
     return FRINGE_RECIPES
       .map((recipe) => {
-        const blocked = recipe.keys.some((key) => !isIngredientAllowed(key, restrictions));
-        const misses = recipe.keys.filter((key) => disliked.has(key));
+        const blocked = recipe.keys.some((key) => !isRecommendationKeyAllowed(key, restrictions));
+        const misses = recipe.keys.filter((key) => recommendationKeyMatches(disliked, key));
         if (blocked || misses.length) return null;
 
-        const hits = recipe.keys.filter((key) => liked.has(key));
+        const hits = recipe.keys.filter((key) => recommendationKeyMatches(liked, key));
         const cuisineScore = Math.max(0, affinities[recipe.cuisine] || 0);
         const adventureFit = 100 - Math.abs(adventure - recipe.fringe * 10);
         let score = recipe.fringe + hits.length * 8 + cuisineScore * 2 + adventureFit / 20;
@@ -1432,11 +1516,13 @@
     const bLiked = profileLikedIngredients(b);
     const aDisliked = profileDislikedIngredients(a);
     const bDisliked = profileDislikedIngredients(b);
+    const restrictions = [...(a.restrictions || []), ...(b.restrictions || [])];
 
     return DISH_BANK.map((d) => {
-      const aHits = d.triggers.filter((t) => aLiked.has(t));
-      const bHits = d.triggers.filter((t) => bLiked.has(t));
-      const anyMiss = d.triggers.some((t) => aDisliked.has(t) || bDisliked.has(t));
+      if (!d.triggers.every((key) => isRecommendationKeyAllowed(key, restrictions))) return null;
+      const aHits = d.triggers.filter((t) => recommendationKeyMatches(aLiked, t));
+      const bHits = d.triggers.filter((t) => recommendationKeyMatches(bLiked, t));
+      const anyMiss = d.triggers.some((t) => recommendationKeyMatches(aDisliked, t) || recommendationKeyMatches(bDisliked, t));
       if (anyMiss || aHits.length === 0 || bHits.length === 0) return null;
       return { ...d, score: aHits.length + bHits.length, hitKeys: [...new Set([...aHits, ...bHits])] };
     })
@@ -1451,10 +1537,10 @@
     const bDisliked = profileDislikedIngredients(b);
 
     return DISH_BANK.map((d) => {
-      const aWants = d.triggers.filter((t) => aLiked.has(t)).length;
-      const bWants = d.triggers.filter((t) => bLiked.has(t)).length;
-      const aHates = d.triggers.filter((t) => aDisliked.has(t)).length;
-      const bHates = d.triggers.filter((t) => bDisliked.has(t)).length;
+      const aWants = d.triggers.filter((t) => recommendationKeyMatches(aLiked, t)).length;
+      const bWants = d.triggers.filter((t) => recommendationKeyMatches(bLiked, t)).length;
+      const aHates = d.triggers.filter((t) => recommendationKeyMatches(aDisliked, t)).length;
+      const bHates = d.triggers.filter((t) => recommendationKeyMatches(bDisliked, t)).length;
       if ((aWants > 0 && bHates > 0) || (bWants > 0 && aHates > 0)) {
         const who = aHates > 0 ? "a" : "b";
         return { ...d, who };
@@ -1676,17 +1762,27 @@
 
     const likes = [];
     const dislikes = [];
+    const modeLikes = [];
+    const modeDislikes = [];
     Object.entries(quiz.responses).forEach(([id, v]) => {
       if (typeof v === "number" && v > 0) {
         if (id.startsWith("c:")) {
           const c = CUISINES.find((x) => "c:" + x.id === id);
           if (c) likes.push(c.label.split(",")[0]);
         }
+        if (id.startsWith("m:")) {
+          const mode = epicure ? epicure.modeById[id.slice(2)] : null;
+          if (mode) modeLikes.push(modePresentation(mode).title);
+        }
       }
       if (typeof v === "number" && v < 0) {
         if (id.startsWith("c:")) {
           const c = CUISINES.find((x) => "c:" + x.id === id);
           if (c) dislikes.push(c.label.split(",")[0]);
+        }
+        if (id.startsWith("m:")) {
+          const mode = epicure ? epicure.modeById[id.slice(2)] : null;
+          if (mode) modeDislikes.push(modePresentation(mode).title);
         }
       }
     });
@@ -1696,6 +1792,11 @@
     }
 
     if (quiz.phase === "modes" || quiz.phase === "ingredients") {
+      const current = currentCard(quiz);
+      if (current && current.type === "ingredient-probe" && current.parentLabel) {
+        return `Testing ${current.label} inside ${current.parentLabel} so one broad answer does not overgeneralize.`;
+      }
+
       const ingLikes = [];
       const ingDislikes = [];
       Object.entries(quiz.responses).forEach(([id, v]) => {
@@ -1711,6 +1812,12 @@
       }
       if (ingDislikes.length >= 1 && ingLikes.length >= 1) {
         return `${ingLikes[ingLikes.length - 1]} yes, ${ingDislikes[ingDislikes.length - 1]} no. Narrowing it down...`;
+      }
+      if (modeLikes.length) {
+        return `Deepening your ${modeLikes[modeLikes.length - 1].toLowerCase()} yes with sharper ingredient checks.`;
+      }
+      if (modeDislikes.length) {
+        return `Using your ${modeDislikes[modeDislikes.length - 1].toLowerCase()} pass as a guardrail.`;
       }
       if (likes.length) {
         return `Exploring flavors from your ${likes[0]} preference...`;
@@ -2365,7 +2472,7 @@
           <div class="mini-stats">
             ${statBlock(counts.likes, "yes")}
             ${statBlock(counts.dislikes, "no")}
-            ${statBlock(counts.unknown, "new")}
+            ${statBlock(counts.unknown, "unsure")}
           </div>
           ${progress.pct >= 40 ? `<button class="btn btn-quiet full" data-action="finish-early">Finish now</button>` : ""}
         </aside>
@@ -2798,18 +2905,16 @@
   }
 
   function renderQuizTree(quiz) {
-    const end = Math.min(quiz.queue.length, quiz.pos + 1);
-    const cards = quiz.queue.slice(0, end);
-    const visible = cards.slice(-8);
-    const hiddenCount = cards.length - visible.length;
+    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 9);
     const nodes = [];
+    const answered = Object.keys(quiz.responses || {}).length;
 
     nodes.push(`
       <li class="tree-node root">
         <span class="tree-marker"></span>
         <div class="tree-copy">
-          <strong>Taste scan</strong>
-          <small>${quiz.pos + 1} of ${QUIZ_TARGET}</small>
+          <strong>Decision tree</strong>
+          <small>${answered} of ${QUIZ_TARGET} answers mapped</small>
         </div>
       </li>
     `);
@@ -2819,30 +2924,80 @@
         <li class="tree-node collapsed">
           <span class="tree-marker"></span>
           <div class="tree-copy">
-            <strong>${hiddenCount} earlier branches</strong>
-            <small>Kept out of view</small>
+            <strong>${hiddenCount} earlier decisions</strong>
+            <small>Kept out of this compact view</small>
           </div>
         </li>
       `);
     }
 
     visible.forEach((card, offset) => {
-      const index = hiddenCount + offset;
-      const isActive = index === quiz.pos;
+      const isActive = card === currentCard(quiz);
       const value = quiz.responses[card.id];
       const nodeState = treeState(value, isActive);
+      const classes = [
+        "tree-node",
+        nodeState.key,
+        card.type === "ingredient-probe" ? "branch" : "",
+        card.id === activeParentId ? "parent-context" : "",
+      ].filter(Boolean).join(" ");
       nodes.push(`
-        <li class="tree-node ${nodeState.key} ${card.type === "ingredient-probe" ? "branch" : ""}">
+        <li class="${classes}">
           <span class="tree-marker">${esc(nodeState.short)}</span>
           <div class="tree-copy">
             <strong>${esc(card.label)}</strong>
-            <small>${esc(card.parentLabel ? "from " + card.parentLabel : cardTypeLabel(card))}</small>
+            <small>${esc(treeNodeDetail(card, value, isActive))}</small>
           </div>
         </li>
       `);
     });
 
-    return `<ol class="path-tree" aria-label="Taste path tree">${nodes.join("")}</ol>`;
+    return `<ol class="path-tree" aria-label="Taste decision tree">${nodes.join("")}</ol>`;
+  }
+
+  function treeVisibleCards(quiz, limit) {
+    const end = Math.min(quiz.queue.length, quiz.pos + 1);
+    const cards = quiz.queue.slice(0, end);
+    const visible = cards.slice(-limit);
+    const active = currentCard(quiz);
+    let activeParentId = null;
+
+    if (active && active.parentId) {
+      activeParentId = active.parentId;
+      const hasParent = visible.some((card) => card.id === active.parentId);
+      const parent = cards.find((card) => card.id === active.parentId);
+      if (!hasParent && parent) {
+        visible.unshift(parent);
+        while (visible.length > limit) visible.splice(1, 1);
+      }
+    }
+
+    const visibleIds = new Set(visible.map((card) => card.id));
+    return {
+      visible,
+      hiddenCount: Math.max(0, cards.filter((card) => !visibleIds.has(card.id)).length),
+      activeParentId,
+    };
+  }
+
+  function treeNodeDetail(card, value, isActive) {
+    if (isActive) {
+      if (card.parentLabel) {
+        return `next check from ${card.parentLabel}${card.parentAnswer ? " · " + card.parentAnswer : ""}`;
+      }
+      return `next ${cardTypeLabel(card).toLowerCase()}`;
+    }
+
+    if (card.type === "ingredient-probe") {
+      const branch = card.parentAnswer ? card.parentAnswer + " from " : "from ";
+      return `${branch}${card.parentLabel || "this branch"}`;
+    }
+
+    if (value !== undefined) {
+      return `${cardTypeLabel(card)} · ${answerLabel(value)}`;
+    }
+
+    return cardTypeLabel(card);
   }
 
   function renderCompleteTracker(quiz) {
@@ -2903,11 +3058,10 @@
   function renderCuisineEvidence(rows) {
     const ordered = [...rows].sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
     const renderCard = (row) => {
-      const regionLabel = answerLabel(row.direct);
       const clusterLabel = contributionLabel(row.cluster);
       const ingredientLabel = contributionLabel(row.ingredient);
       const parts = [];
-      if (regionLabel !== "No signal") parts.push(`<span>Region: ${esc(regionLabel)}</span>`);
+      if (row.direct != null) parts.push(`<span>Region: ${esc(answerLabel(row.direct))}</span>`);
       if (clusterLabel !== "No signal") parts.push(`<span>Clusters: ${esc(clusterLabel)}</span>`);
       if (ingredientLabel !== "No signal") parts.push(`<span>Ingredients: ${esc(ingredientLabel)}</span>`);
       return `
@@ -2922,10 +3076,12 @@
     };
     const strong = ordered.filter((row) => cuisineSignalLabel(row.score) !== "No clear pull");
     const weak = ordered.filter((row) => cuisineSignalLabel(row.score) === "No clear pull");
+    const visible = strong.length ? strong : weak.slice(0, 3);
+    const hidden = strong.length ? weak : weak.slice(3);
     return `
       <div class="cuisine-evidence">
-        ${strong.map(renderCard).join("")}
-        ${weak.length ? `<div class="cuisine-weak" hidden>${weak.map(renderCard).join("")}</div><button type="button" class="link-toggle" data-toggle-target="cuisine-weak">Show ${weak.length} more</button>` : ""}
+        ${visible.map(renderCard).join("")}
+        ${hidden.length ? `<div class="cuisine-weak" hidden>${hidden.map(renderCard).join("")}</div><button type="button" class="link-toggle" data-toggle-target="cuisine-weak">Show ${hidden.length} more</button>` : ""}
       </div>
     `;
   }
@@ -2948,6 +3104,7 @@
 
   function answerLabel(value) {
     if (value == null) return "No answer";
+    if (value === "unknown") return "Unsure";
     const option = ANSWER_OPTIONS.find((item) => item.value === value);
     const legacyLabels = {
       "-2": "Hard no",
@@ -2978,6 +3135,9 @@
           <b>${value}</b>
         </div>
       `);
+    if (!rows.length) {
+      return `<div class="empty-state">No clear flavor center yet. Answer a few recipe-pattern or ingredient questions to build this out.</div>`;
+    }
     return `<div class="taste-bars">${rows.join("")}</div>`;
   }
 
@@ -3220,7 +3380,7 @@
   function copyPromptFromButton(btn) {
     const target = document.getElementById(btn.dataset.promptTarget);
     if (!target) return;
-    copyToClipboardFallback(target.textContent || "", "Prompt copied!");
+    copyToClipboard(target.textContent || "", "Prompt copied!");
   }
 
   // ─── CARD INTERACTION ──────────────────────────────────────────
