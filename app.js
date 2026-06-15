@@ -499,6 +499,32 @@
     return isIngredientAllowed(canonicalIngredientKey(key), restrictions);
   }
 
+  function blockedTagsForRestrictions(restrictions) {
+    const blocked = new Set();
+    (restrictions || []).forEach((r) => {
+      const rest = RESTRICTIONS.find((x) => x.id === r);
+      if (rest) rest.tags.forEach((tag) => blocked.add(tag));
+    });
+    return blocked;
+  }
+
+  function restaurantBlockedTags(restaurant, restrictions) {
+    const blocked = blockedTagsForRestrictions(restrictions);
+    if (!blocked.size) return [];
+
+    const text = `${restaurant.name} ${restaurant.keys.join(" ")}`.toLowerCase();
+    const tags = new Set();
+    if (/steak|bbq|barbecue|korean bbq/.test(text)) tags.add("meat");
+    if (/steak|beef|bone_marrow/.test(text)) tags.add("beef");
+    if (/pork|bacon|ham|prosciutto|pancetta|chorizo/.test(text)) tags.add("pork");
+    if (/sushi|sashimi|seafood|fish|salmon|tuna|dashi|bonito|eel/.test(text)) tags.add("fish");
+    if (/seafood|shrimp|crab|lobster|oyster|clam|mussel|squid|octopus/.test(text)) tags.add("shellfish");
+    if (/cheese|dairy|cream|butter|ghee/.test(text)) tags.add("dairy");
+    if (/egg/.test(text)) tags.add("egg");
+
+    return [...tags].filter((tag) => blocked.has(tag));
+  }
+
   function ingredientEmoji(ingredient) {
     const f = featureForIngredient(ingredient);
     return f ? f[0] : fallbackIngredientEmoji(ingredient);
@@ -1060,7 +1086,8 @@
       }
 
       if (id.startsWith("i:")) {
-        const modes = epicure ? epicure.ingredientModes[id.slice(2)] || [] : [];
+        const ingredient = id.slice(2);
+        const modes = epicure ? epicure.ingredientModes[ingredient] || [] : [];
         const evidenceModes = modes
           .map((modeId) => epicure ? epicure.modeById[modeId] : null)
           .map((mode) => ({ mode, cuisineIds: modeCuisineIds(mode) }))
@@ -1070,6 +1097,7 @@
         evidenceModes.forEach((entry) => {
           distributeCuisineEvidence(rows, entry.cuisineIds, value, weight, "ingredient");
         });
+        distributeCuisineEvidence(rows, inferredCuisineIdsForIngredient(ingredient), value, CUISINE_INGREDIENT_WEIGHT, "ingredient");
       }
     });
 
@@ -1102,6 +1130,13 @@
   function inferredCuisineIdsForMode(mode) {
     if (!mode) return [];
     const text = `${mode.label} ${mode.members.slice(0, 24).join(" ")}`.toLowerCase();
+    return Object.entries(CUISINE_KEYWORDS)
+      .filter(([, keywords]) => keywords.some((keyword) => text.includes(keyword)))
+      .map(([cuisineId]) => cuisineId);
+  }
+
+  function inferredCuisineIdsForIngredient(ingredient) {
+    const text = ingredient.replace(/_/g, " ").toLowerCase();
     return Object.entries(CUISINE_KEYWORDS)
       .filter(([, keywords]) => keywords.some((keyword) => text.includes(keyword)))
       .map(([cuisineId]) => cuisineId);
@@ -1425,7 +1460,9 @@
       if (!allowedKeys.length) return null;
 
       const blockedKeys = r.keys.filter((key) => !isRecommendationKeyAllowed(key, restrictions));
-      if (blockedKeys.length > allowedKeys.length) return null;
+      const blockedTags = restaurantBlockedTags(r, restrictions);
+      const blockedCount = blockedKeys.length + blockedTags.length;
+      if (blockedCount > allowedKeys.length) return null;
 
       let score = 0;
       r.cuisines.forEach((c) => { score += Math.max(0, affinities[c] || 0) * 2; });
@@ -1434,11 +1471,11 @@
       const misses = allowedKeys.filter((k) => recommendationKeyMatches(disliked, k));
       score += hits.length * 3;
       score -= misses.length * 4;
-      score -= blockedKeys.length;
-      return { ...r, score, hits: hits.length, hitKeys: hits, misses: misses.length, missKeys: misses };
+      score -= blockedCount * 3;
+      return { ...r, score, hits: hits.length, hitKeys: hits, misses: misses.length, missKeys: misses, blockedCount };
     })
     .filter(Boolean)
-    .filter((r) => r.score > 1 && (r.hits >= 1 || r.cuisines.length > 0))
+    .filter((r) => r.score > 1 && (r.hits >= 1 || (r.cuisines.length > 0 && r.blockedCount === 0)))
     .sort((a, b) => b.score - a.score);
   }
 
@@ -1604,6 +1641,7 @@
     const sharedDishes = suggestSharedDishes(a, b).slice(0, 8).map((d) => d.dish);
     const avoidDishes = suggestAvoidDishes(a, b).slice(0, 6).map((d) => d.dish);
     const sharedLikes = result.sharedLikes.map((item) => item.label).slice(0, 12);
+    const sharedDirections = result.sharedDirections.map((item) => item.label).slice(0, 6);
     const conflicts = result.conflicts.map((item) => item.label).slice(0, 10);
     const bridges = result.bridges.map((item) => item.label).slice(0, 10);
     const aCuisines = promptCuisineLabels(a, 3);
@@ -1622,6 +1660,7 @@
       "Shared fit:",
       `- Match score: ${result.score}/100.`,
       `- Things we both like or can safely build around: ${formatPromptList(sharedLikes, "No exact overlaps yet")}.`,
+      `- Shared cuisine or regional directions: ${formatPromptList(sharedDirections, "No shared region signal yet")}.`,
       `- Shared dish directions: ${formatPromptList(sharedDishes, "Use cuisine and ingredient signals instead")}.`,
       `- Restaurant categories already suggested by the matcher: ${formatPromptList(sharedRestaurants, "No confident shared restaurant category yet")}.`,
       "",
@@ -1653,7 +1692,7 @@
 
   function promptCuisineLabels(profile, limit) {
     return buildCuisineEvidence(profile)
-      .filter((row) => row.score > 0.4)
+      .filter((row) => row.score > 0.1)
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
       .map((row) => row.label);
@@ -1722,19 +1761,47 @@
       if (a.responses[id] === undefined || a.responses[id] === "unknown") bridges.push({ id, from: "b" });
     }
 
+    const sharedDirections = sharedCuisineDirections(a, b);
+    const sharedRestaurantCount = suggestSharedRestaurants(a, b).length;
+    const sharedDishCount = suggestSharedDishes(a, b).length;
     const totalAnswered = new Set([...Object.keys(a.responses), ...Object.keys(b.responses)]).size;
     const overlapBonus = sharedLikes.length * 4;
     const nicheBonus = sharedLikes.filter((id) => id.startsWith("i:") && ingredientControversy(id.slice(2)) >= 4).length * 3;
-    const conflictPenalty = conflicts.length * 5;
-    const baseScore = totalAnswered > 0 ? Math.round((sharedLikes.length / Math.max(1, Math.min(aLikes.size, bLikes.size))) * 50) : 50;
-    const score = Math.max(0, Math.min(100, baseScore + overlapBonus + nicheBonus - conflictPenalty));
+    const directionBonus = Math.min(20, sharedDirections.reduce((sum, item) => sum + Math.min(6, item.score * 3), 0));
+    const restaurantBonus = Math.min(18, sharedRestaurantCount * 3);
+    const dishBonus = Math.min(12, sharedDishCount * 4);
+    const conflictPenalty = conflicts.length * 7;
+    const baseScore = totalAnswered > 0 ? Math.round((sharedLikes.length / Math.max(1, Math.min(aLikes.size, bLikes.size))) * 42) : 50;
+    const score = Math.max(0, Math.min(100, Math.round(baseScore + overlapBonus + nicheBonus + directionBonus + restaurantBonus + dishBonus - conflictPenalty)));
 
     return {
       score,
       sharedLikes: sharedLikes.map(responseInfo),
+      sharedDirections,
       conflicts: conflicts.map((c) => ({ ...responseInfo(c.id), who: c.who })),
       bridges: bridges.slice(0, 8).map((b) => ({ ...responseInfo(b.id), from: b.from })),
     };
+  }
+
+  function sharedCuisineDirections(a, b) {
+    const bRows = {};
+    buildCuisineEvidence(b).forEach((row) => { bRows[row.id] = row; });
+
+    return buildCuisineEvidence(a)
+      .map((row) => {
+        const other = bRows[row.id];
+        const score = other ? Math.min(row.score, other.score) : 0;
+        return {
+          id: "direction:" + row.id,
+          label: row.label,
+          emoji: CUISINE_EMOJI[row.id] || "\u{1F37D}\uFE0F",
+          type: "direction",
+          score,
+        };
+      })
+      .filter((row) => row.score > 0.1)
+      .sort((x, y) => y.score - x.score)
+      .slice(0, 5);
   }
 
   function responseInfo(id) {
@@ -2701,18 +2768,19 @@
     const sharedDishes = suggestSharedDishes(a, b);
     const avoidDishes = suggestAvoidDishes(a, b);
     const sharedPrompt = buildCompatibilityRestaurantPrompt(a, b);
+    const sharedSignalCount = result.sharedLikes.length + result.sharedDirections.length;
 
     shell(`
       <section class="compare-hero">
         <div>
           <div class="eyebrow">Shared table</div>
           <h2>${esc(aName)} <span>and</span> ${esc(bName)}</h2>
-          <p>${result.sharedLikes.length} shared signals, ${result.conflicts.length} watch-outs, ${result.bridges.length} possible introductions.</p>
+          <p>${sharedSignalCount} shared signals, ${result.conflicts.length} watch-outs, ${result.bridges.length} possible introductions.</p>
         </div>
         <div class="score-dial">
           <span>${result.score}</span>
           <small>compatibility score</small>
-          <em>0-100 from shared likes minus conflicts</em>
+          <em>0-100 from shared likes, directions, dishes, and conflicts</em>
         </div>
       </section>
 
@@ -2745,9 +2813,11 @@
         <div class="panel panel-wide">
           <div class="section-label">You both like</div>
           <h3>Common ground</h3>
-          <p class="panel-hint">Exact overlaps are the safest starting point.</p>
+          <p class="panel-hint">Exact overlaps are safest; shared regional pulls catch compatible nearby tastes.</p>
           <div class="food-grid">
-            ${result.sharedLikes.length ? result.sharedLikes.map((f) => renderFoodTag(f)).join("") : `<span class="food-tag dim">Nothing exact yet</span>`}
+            ${result.sharedLikes.length || result.sharedDirections.length
+              ? [...result.sharedLikes, ...result.sharedDirections].map((f) => renderFoodTag(f, f.type === "direction" ? "bridge" : "")).join("")
+              : `<span class="food-tag dim">Nothing exact yet</span>`}
           </div>
         </div>
 
