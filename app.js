@@ -2084,7 +2084,7 @@
         </header>
         ${content}
         <footer class="footer">
-          Source: <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Epicure</a>
+          Built on <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Epicure</a>, an open research dataset of ingredient pairings in real recipes.
         </footer>
         ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ""}
       </div>
