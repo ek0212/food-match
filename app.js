@@ -1089,7 +1089,8 @@
     Object.keys(quiz.responses).forEach((k) => already.add(k));
 
     const candidates = [];
-    for (const ing of Object.keys(FEAT)) {
+    for (const featKey of Object.keys(FEAT)) {
+      const ing = canonicalIngredientKey(featKey);
       if (already.has("i:" + ing)) continue;
       if (!epicure.ingredients.has(ing)) continue;
       if (!isIngredientAllowed(ing, quiz.restrictions)) continue;
@@ -1114,11 +1115,12 @@
     Object.keys(quiz.responses).forEach((k) => already.add(k));
 
     const candidates = Object.keys(FEAT)
+      .map((featKey) => canonicalIngredientKey(featKey))
       .filter((ing) => !already.has("i:" + ing))
       .filter((ing) => epicure.ingredients.has(ing))
       .filter((ing) => isIngredientAllowed(ing, quiz.restrictions))
       .filter((ing) => !SKIP_SET.has(ing))
-      .map((ing) => ({ ing, score: ingredientControversy(ing) + (FEAT[ing] ? 2 : 0) }))
+      .map((ing) => ({ ing, score: ingredientControversy(ing) + (featureForIngredient(ing) ? 2 : 0) }))
       .sort((a, b) => b.score - a.score);
 
     return candidates.slice(0, count).map((c) => makeIngredientCard(c.ing, "Deep dive", {
@@ -2084,6 +2086,33 @@
     return parts.join(" ");
   }
 
+  function generateHeroSummary(profile) {
+    const adventure = adventureScore(profile);
+    const advLabel = adventure > 65 ? "Adventurous" : adventure > 35 ? "Open-minded" : "Comfort-leaning";
+
+    const affinities = cuisineAffinities(profile);
+    const CUISINE_NAMES = {
+      East_Asian: "East Asian", Southeast_Asian: "Southeast Asian",
+      South_Asian: "South Asian", Mediterranean: "Mediterranean",
+      Latin_American: "Latin American", Western_Atlantic: "Western comfort food",
+      Japanese: "Japanese",
+    };
+    const sorted = Object.entries(affinities).sort((a, b) => b[1] - a[1]);
+    const top = sorted[0];
+    if (top && top[1] > 0) {
+      return `${advLabel}, leans ${CUISINE_NAMES[top[0]] || top[0]}.`;
+    }
+    return `${advLabel} eater.`;
+  }
+
+  function adventureCopy(details) {
+    const asked = details.tested + details.skipped;
+    if (asked <= 0) {
+      return "Not enough divisive ingredient answers yet, so the score starts at 50.";
+    }
+    return `You said yes to ${details.accepted} of the ${asked} most-polarizing foods we asked about.`;
+  }
+
   // ─── DAYLIST ───────────────────────────────────────────────────
 
   function generateDaylist(profile) {
@@ -2503,6 +2532,15 @@
             <span class="no">\u00D7 no</span>
           </div>
         </div>
+
+        <div class="panel panel-wide panel-full">
+          <div class="section-label">About the data</div>
+          <h3>Research basis</h3>
+          <p><strong>Epicure</strong> is a 2026 ingredient-embedding study that turns 4.14M recipes into 1,790 clean ingredient names.</p>
+          <p>Food Match uses the recipe-pairing view: ingredients are linked when cooks often use them together.</p>
+          <p>That makes the quiz a walk through learned ingredient neighborhoods, not a fixed cuisine checklist.</p>
+          <p><a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">${esc(EPICURE_PAPER_TITLE)}</a></p>
+        </div>
       </section>
     `);
   }
@@ -2566,11 +2604,12 @@
 
     const incoming = state.incomingProfile;
     const profileCount = loadProfiles().length;
+    const mosaicCuisines = CUISINES.slice(0, 4);
     shell(`
       <section class="setup-layout">
         <div class="setup-copy">
           <div class="eyebrow">Epicure-backed taste matching</div>
-          <h2>Find the table where everyone has something to love.</h2>
+          <h2>Tell us about you, then start a 2-minute quiz.</h2>
           <p>Epicure turns millions of recipes into a map of ingredients that tend to appear together. Food Match uses that map to ask better preference questions.</p>
 
           <div class="dataset-strip" aria-label="Recipe map summary">
@@ -2579,16 +2618,8 @@
             ${statBlock(DATASET_EDGE_COUNT, "ingredient pairings")}
           </div>
 
-          <div class="science-note" aria-label="Research basis">
-            <div class="section-label">Research basis</div>
-            <p><strong>Epicure</strong> is a 2026 ingredient-embedding study that turns 4.14M recipes into 1,790 clean ingredient names.</p>
-            <p>Food Match uses the recipe-pairing view: ingredients are linked when cooks often use them together.</p>
-            <p>That makes the quiz a walk through learned ingredient neighborhoods, not a fixed cuisine checklist.</p>
-            <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">${esc(EPICURE_PAPER_TITLE)}</a>
-          </div>
-
           <div class="cuisine-mosaic" aria-label="Cuisine regions">
-            ${CUISINES.map((c) => `
+            ${mosaicCuisines.map((c) => `
               <div class="cuisine-tile">
                 <span>${esc(CUISINE_DISPLAY[c.id] || c.id)}</span>
               </div>
@@ -2598,12 +2629,12 @@
 
         <div class="setup-panel">
           ${incoming ? `<div class="notice">Comparing with ${esc(incoming.name || "someone")}</div>` : ""}
-          <div class="section-label">Profile</div>
+          <div class="section-label">About you</div>
           <h3>Start a taste scan</h3>
           <label for="setup-name">Name</label>
           <input id="setup-name" type="text" maxlength="40" autocomplete="name" placeholder="Optional" value="${esc(quiz.name)}">
 
-          <div class="section-label mt-20">Dietary boundaries</div>
+          <div class="section-label mt-20">Anything to skip?</div>
           <div class="restrictions">
             ${RESTRICTIONS.map((r) => `
               <button class="restriction-btn ${quiz.restrictions.includes(r.id) || (r.id === "none" && !quiz.restrictions.length) ? "active" : ""}"
@@ -2614,8 +2645,8 @@
           </div>
 
           <div class="setup-actions">
-            <button class="btn btn-primary" data-action="start-quiz">Start matching</button>
-            <span>${profileCount ? `${profileCount} saved profile${profileCount === 1 ? "" : "s"}` : "No saved profiles yet"}</span>
+            <button class="btn btn-primary" data-action="start-quiz">Start the quiz</button>
+            <span>${profileCount ? `<button type="button" class="link-toggle" data-action="history">View ${profileCount} past result${profileCount === 1 ? "" : "s"}</button>` : "No saved profiles yet"}</span>
           </div>
         </div>
       </section>
@@ -2718,17 +2749,17 @@
     saveProfile(profile);
     state.profile = profile;
 
-    const probeCount = quiz.queue.filter((c, i) => i < quiz.pos && c.type === "ingredient-probe").length;
-    const counts = quizCounts(quiz);
-    const answerCount = Object.keys(quiz.responses).length;
+    const answeredCards = answeredQuizCards(quiz);
+    const tallies = answerTallies(answeredCards, quiz.responses);
+    const answerCount = answeredCards.length;
 
     shell(`
       <section class="done-panel">
         <div class="eyebrow">Done</div>
-        <h2>${answerCount} answers mapped</h2>
-        <p>${counts.likes} yes, ${counts.dislikes} no${probeCount ? `, ${probeCount} follow-up checks` : ""}.</p>
+        <h2>${answerCount} of ${answerCount} answers mapped</h2>
+        <p>${tallies.yes} yes, ${tallies.no} no${tallies.unsure ? `, ${tallies.unsure} follow-up checks` : ""}.</p>
         <div class="complete-tracker" aria-label="Completed taste path">
-          ${renderCompleteTracker(quiz)}
+          ${renderCompleteTracker(quiz, answeredCards)}
         </div>
         <button class="btn btn-primary mt-16" data-action="show-results">Scroll to analysis</button>
       </section>
@@ -2764,12 +2795,14 @@
     const disliked = topResponses(profile, (id, v) => typeof v === "number" && v < 0).slice(0, 6);
     const namePossessive = profile.name ? esc(profile.name) + "'s" : "Your";
 
+    const heroSummary = generateHeroSummary(profile);
     shell(`
       <section class="results-hero">
         <div>
           <div class="eyebrow">${namePossessive} palate</div>
-          <h2>${esc(daylist)}</h2>
+          <h2>${esc(heroSummary)}</h2>
           <p>${esc(narrative)}</p>
+          <p class="hero-daylist"><em>${esc(daylist)}</em></p>
         </div>
         <div class="score-card">
           <div class="score-dial">
@@ -2778,7 +2811,7 @@
           </div>
           <div class="score-copy">
             <strong>Adventure score</strong>
-            <span>${esc(adventureSummary(adventure))}</span>
+            <span>${esc(adventureCopy(adventure))}</span>
             <div class="score-math" aria-label="Adventure score evidence">
               <span>${adventure.accepted} accepted</span>
               <span>${adventure.neutral} neutral</span>
@@ -2788,57 +2821,33 @@
         </div>
       </section>
 
+      <nav class="results-toc" aria-label="Jump to section">
+        <a href="#section-taste">Your taste</a>
+        <a href="#section-eat">Where to eat &amp; what to order</a>
+        <a href="#section-share">Share &amp; compare</a>
+      </nav>
+
+      <h3 class="results-section-heading" id="section-taste">Your taste</h3>
       <section class="dashboard-grid">
-        <div class="panel panel-wide">
+        <div class="panel panel-wide panel-soft">
           <div class="panel-heading">
             <div>
               <div class="section-label">Cuisine compass</div>
-              <h3>Regional evidence <button type="button" class="hint-icon" aria-label="More info" title="This combines direct region answers with later recipe-cluster and ingredient-neighborhood evidence.">?</button></h3>
+              <h3>Regional evidence ${hintBlock("This combines direct region answers with later recipe-cluster and ingredient-neighborhood evidence.")}</h3>
             </div>
           </div>
           ${renderCuisineEvidence(cuisineEvidence)}
         </div>
 
-        <div class="panel">
+        <div class="panel panel-soft">
           <div class="section-label">Taste spectrum</div>
-          <h3>Flavor center <button type="button" class="hint-icon" aria-label="More info" title="This compresses many answers into the flavors most likely to matter.">?</button></h3>
+          <h3>Top flavors ${hintBlock("This compresses many answers into the flavors most likely to matter.")}</h3>
           ${renderTasteBars(taste)}
         </div>
 
-        <div class="panel panel-wide">
-          <div class="section-label">Where to eat</div>
-          <h3>Restaurant fit <button type="button" class="hint-icon" aria-label="More info" title="These places match the ingredients and regions you kept saying yes to.">?</button></h3>
-          <div class="recommendation-list">
-            ${restaurants.length ? restaurants.slice(0, 5).map(renderRestaurantCard).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
-          </div>
-        </div>
-
-        <div class="panel panel-wide panel-full prompt-panel">
-          <div class="section-label">Restaurant search prompt</div>
-          <h3>Find places near me</h3>
-          <p class="panel-hint">Copy this into Google Maps, Ask Maps, ChatGPT, or another local search tool.</p>
-          ${renderPromptCard("personal-restaurant-prompt", restaurantPrompt.text, restaurantPrompt.mapsQuery)}
-        </div>
-
-        <div class="panel">
-          <div class="section-label">What to order</div>
-          <h3>Dish ideas <button type="button" class="hint-icon" aria-label="More info" title="Dishes appear when your yes answers cover their key ingredients.">?</button></h3>
-          <div class="dish-stack">
-            ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
-          </div>
-        </div>
-
-        <div class="panel panel-wide panel-full">
-          <div class="section-label">Fringe recipes</div>
-          <h3>Try something new <button type="button" class="hint-icon" aria-label="More info" title="These push the boundary without using ingredients you already rejected.">?</button></h3>
-          <div class="fringe-list">
-            ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
-          </div>
-        </div>
-
-        <div class="panel panel-wide">
+        <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Evidence</div>
-          <h3>Strong signals <button type="button" class="hint-icon" aria-label="More info" title="These answers did the most work in shaping the suggestions.">?</button></h3>
+          <h3>What shaped your result ${hintBlock("These answers did the most work in shaping the suggestions.")}</h3>
           <div class="split-evidence">
             <div>
               <div class="subhead">Likes</div>
@@ -2852,13 +2861,59 @@
             </div>
           </div>
         </div>
+      </section>
 
-        <div class="panel">
+      <h3 class="results-section-heading" id="section-eat">Where to eat &amp; what to order</h3>
+      <section class="dashboard-grid">
+        <div class="panel panel-wide panel-soft">
+          <div class="section-label">Where to eat</div>
+          <h3>Restaurant fit ${hintBlock("These places match the ingredients and regions you kept saying yes to.")}</h3>
+          <p class="panel-hint">(category, not a specific spot)</p>
+          <div class="recommendation-list">
+            ${restaurants.length ? restaurants.slice(0, 5).map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
+          </div>
+        </div>
+
+        <div class="panel panel-soft">
+          <div class="section-label">What to order</div>
+          <h3>Dish ideas ${hintBlock("Dishes appear when your yes answers cover their key ingredients.")}</h3>
+          <div class="dish-stack">
+            ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
+          </div>
+        </div>
+
+        <div class="panel panel-wide panel-full panel-soft">
+          <div class="section-label">Fringe recipes</div>
+          <h3>Try something new ${hintBlock("These push the boundary without using ingredients you already rejected.")}</h3>
+          <div class="fringe-list">
+            ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
+          </div>
+        </div>
+      </section>
+
+      <h3 class="results-section-heading" id="section-share">Share &amp; compare</h3>
+      <section class="dashboard-grid">
+        <div class="panel panel-soft">
           <div class="section-label">Share</div>
           <h3>Compare with someone</h3>
           <div class="btn-row vertical">
             <button class="btn btn-primary" data-action="share-invite">Invite to compare</button>
             <button class="btn" data-action="share-profile">Copy profile link</button>
+          </div>
+        </div>
+
+        <div class="panel panel-wide panel-full panel-soft prompt-split">
+          <div class="section-label">Find places near me</div>
+          <h3>Restaurant search prompts</h3>
+          <div class="prompt-split-grid">
+            <div class="prompt-split-card">
+              <div class="section-label">For Google Maps</div>
+              ${renderMapsPromptCard("personal-restaurant-maps", restaurantPrompt.mapsQuery)}
+            </div>
+            <div class="prompt-split-card">
+              <div class="section-label">For ChatGPT / AI</div>
+              ${renderLLMPromptCard("personal-restaurant-llm", restaurantPrompt.text)}
+            </div>
           </div>
         </div>
       </section>
@@ -3181,15 +3236,28 @@
     return cardTypeLabel(card);
   }
 
-  function renderCompleteTracker(quiz) {
-    const answeredCards = quiz.queue
+  function answeredQuizCards(quiz) {
+    return quiz.queue
       .slice(0, quiz.pos)
-      .filter((card) => quiz.responses[card.id] !== undefined)
-      .slice(-10);
+      .filter((card) => quiz.responses[card.id] !== undefined);
+  }
 
+  function answerTallies(cards, responses) {
+    const t = { yes: 0, no: 0, unsure: 0 };
+    cards.forEach((card) => {
+      const v = responses[card.id];
+      if (typeof v === "number" && v > 0) t.yes++;
+      else if (typeof v === "number" && v < 0) t.no++;
+      else t.unsure++;
+    });
+    return t;
+  }
+
+  function renderCompleteTracker(quiz, answeredCards) {
+    const cards = answeredCards || answeredQuizCards(quiz);
     return `
       <ol>
-        ${answeredCards.map((card, index) => {
+        ${cards.map((card, index) => {
           const stateInfo = treeState(quiz.responses[card.id], false);
           return `
             <li class="${stateInfo.key}">
@@ -3242,9 +3310,9 @@
       const clusterLabel = contributionLabel(row.cluster);
       const ingredientLabel = contributionLabel(row.ingredient);
       const parts = [];
-      if (row.direct != null) parts.push(`<span>Region: ${esc(answerLabel(row.direct))}</span>`);
-      if (clusterLabel !== "No signal") parts.push(`<span>Clusters: ${esc(clusterLabel)}</span>`);
-      if (ingredientLabel !== "No signal") parts.push(`<span>Ingredients: ${esc(ingredientLabel)}</span>`);
+      if (row.direct != null) parts.push(`<span>From cuisine answer: ${esc(answerLabel(row.direct))}</span>`);
+      if (clusterLabel !== "No signal") parts.push(`<span>From related groups: ${esc(clusterLabel)}</span>`);
+      if (ingredientLabel !== "No signal") parts.push(`<span>From specific foods: ${esc(ingredientLabel)}</span>`);
       return `
         <div class="cuisine-card ${cuisineTone(row)}">
           <div class="cuisine-card-top">
@@ -3322,11 +3390,12 @@
     return `<div class="taste-bars">${rows.join("")}</div>`;
   }
 
-  function renderRestaurantCard(r) {
+  function renderRestaurantCard(r, opts) {
     const hasHits = r.hitKeys && r.hitKeys.length;
+    const prefix = opts && opts.stylePrefix ? "Style: " : "";
     return `
       <div class="rest-card">
-        <div class="rest-title"><strong>${esc(r.name)}</strong></div>
+        <div class="rest-title"><strong>${esc(prefix + r.name)}</strong></div>
         ${hasHits ? `<div class="match-reason">${esc(`Key matches: ${formatIngredientList(r.hitKeys, 4)}`)}</div>` : ""}
       </div>
     `;
@@ -3367,6 +3436,33 @@
         </div>
       </div>
     `;
+  }
+
+  function renderMapsPromptCard(id, mapsQuery) {
+    return `
+      <div class="prompt-card">
+        <pre id="${esc(id)}" class="prompt-text">${esc(mapsQuery || "")}</pre>
+        <div class="prompt-actions">
+          <button class="btn btn-primary" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
+          <a class="btn" href="${esc(googleMapsSearchUrl(mapsQuery))}" target="_blank" rel="noopener">Open in Google Maps</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLLMPromptCard(id, promptText) {
+    return `
+      <div class="prompt-card">
+        <pre id="${esc(id)}" class="prompt-text">${esc(promptText)}</pre>
+        <div class="prompt-actions">
+          <button class="btn btn-primary" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function hintBlock(text) {
+    return `<details class="hint-block"><summary aria-label="More info">?</summary><div>${esc(text)}</div></details>`;
   }
 
   function formatIngredientList(keys, limit) {
