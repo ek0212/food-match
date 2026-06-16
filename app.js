@@ -11,6 +11,14 @@
   const STORAGE_KEY = "food-match-v3";
   const VERSION = 3;
   const MAX_PROFILES = 12;
+  // ─── DEBUG (developer-only) ────────────────────────────────────
+  const DEBUG_STORAGE_KEY = "food-match-debug";
+  const DEBUG_PARAM = "debug";
+  const SEED_PARAM = "seed";
+  const ROUTE_PARAM = "route";
+  const ANSWERS_PARAM = "answers";
+  const FIXTURE_PARAM = "fixture";
+  const DEBUG_TAGS = ["data", "route", "quiz", "score", "share", "state"];
   const DATASET_INGREDIENT_COUNT = 1790;
   const DATASET_MODE_COUNT = 150;
   const DATASET_EDGE_COUNT = "203,508";
