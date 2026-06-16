@@ -19,6 +19,27 @@
   const ANSWERS_PARAM = "answers";
   const FIXTURE_PARAM = "fixture";
   const DEBUG_TAGS = ["data", "route", "quiz", "score", "share", "state"];
+  // Fixture answer sequences for ?fixture=NAME. Values are applied in
+  // order to whichever cards the deterministic quiz queue surfaces.
+  // 1 = yes, -1 = no, "unknown" = unsure.
+  const DEBUG_FIXTURES = {
+    adventurous: {
+      restrictions: [],
+      answers: [1, 1, 1, -1, 1, "unknown", 1, 1, -1, 1, 1, 1, "unknown", 1, 1, -1, 1, 1, 1, 1],
+    },
+    picky: {
+      restrictions: [],
+      answers: [-1, -1, "unknown", -1, 1, -1, -1, -1, "unknown", 1, -1, -1, -1, "unknown", -1],
+    },
+    vegetarian: {
+      restrictions: ["vegetarian"],
+      answers: [1, 1, -1, 1, "unknown", 1, 1, -1, 1, 1, 1, 1, "unknown", 1, 1],
+    },
+    empty: {
+      restrictions: [],
+      answers: [],
+    },
+  };
   const DATASET_INGREDIENT_COUNT = 1790;
   const DATASET_MODE_COUNT = 150;
   const DATASET_EDGE_COUNT = "203,508";
