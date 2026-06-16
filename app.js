@@ -431,6 +431,20 @@
 
   const dbg = DEBUG ? makeDebugLogger() : makeNoopLogger();
 
+  if (DEBUG) {
+    // Live REPL handle for poking from devtools. Only exposed when
+    // ?debug=1 or localStorage["food-match-debug"]=1 is set.
+    window.__fm = {
+      get state() { return state; },
+      get epicure() { return epicure; },
+      dbg,
+      fixtures: DEBUG_FIXTURES,
+      encodePayload: function (p) { return encodePayload(p); },
+      decodePayload: function (s) { return decodePayload(s); },
+    };
+    console.log("[debug] Food Match debug mode on. window.__fm exposed. Tags:", DEBUG_TAGS);
+  }
+
   // ─── DATA LAYER ────────────────────────────────────────────────
 
   async function loadEpicure() {
