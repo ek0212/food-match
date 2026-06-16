@@ -373,11 +373,50 @@
     return _rngFn();
   }
 
+  // ─── DEBUG LOGGER (off unless ?debug=1 or localStorage flag) ───
+  // Tagged console.groupCollapsed output for tracing without code
+  // edits. Zero-cost when disabled (callers pass payload objects,
+  // never template strings, so no string building happens).
+
+  const DEBUG = (function () {
+    try {
+      const inUrl = new URLSearchParams(location.search).get(DEBUG_PARAM) === "1";
+      const inStore = localStorage.getItem(DEBUG_STORAGE_KEY) === "1";
+      return inUrl || inStore;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  function noop() {}
+
+  function makeDebugLogger() {
+    const fns = {};
+    DEBUG_TAGS.forEach((tag) => {
+      fns[tag] = function (label, payload) {
+        console.groupCollapsed("[" + tag + "] " + label);
+        if (payload !== undefined) console.log(payload);
+        console.groupEnd();
+      };
+    });
+    return fns;
+  }
+
+  function makeNoopLogger() {
+    const fns = {};
+    DEBUG_TAGS.forEach((tag) => { fns[tag] = noop; });
+    return fns;
+  }
+
+  const dbg = DEBUG ? makeDebugLogger() : makeNoopLogger();
+
   // ─── DATA LAYER ────────────────────────────────────────────────
 
   async function loadEpicure() {
+    dbg.data("fetch", { url: "data/epicure.json" });
     const resp = await fetch("data/epicure.json");
     const data = await resp.json();
+    dbg.data("loaded", { ingredients: data.ingredients.length, modes: data.modes.length });
     return buildIndex(data);
   }
 
@@ -660,6 +699,7 @@
   function respondToCard(quiz, value) {
     const card = currentCard(quiz);
     if (!card) return;
+    dbg.quiz("respond", { cardId: card.id, value, phase: quiz.phase, pos: quiz.pos });
     quiz.responses[card.id] = value;
 
     if (card.type === "mode" && !quiz.probesInjected.has(card.modeId)) {
@@ -1071,8 +1111,9 @@
   // ─── PROFILE ───────────────────────────────────────────────────
 
   function buildProfile(quiz) {
+    dbg.score("build", { name: quiz.name, responses: quiz.responses });
     const id = "fm_" + Date.now().toString(36) + "_" + dbgRng().toString(36).slice(2, 7);
-    return {
+    const profile = {
       v: VERSION,
       id,
       name: quiz.name,
@@ -1080,6 +1121,8 @@
       restrictions: quiz.restrictions,
       responses: { ...quiz.responses },
     };
+    dbg.score("built", { id: profile.id });
+    return profile;
   }
 
   function cuisineAffinities(profile) {
@@ -2062,6 +2105,7 @@
   // ─── URL ENCODING ─────────────────────────────────────────────
 
   function encodePayload(payload) {
+    dbg.share("encode", payload);
     const bytes = new TextEncoder().encode(JSON.stringify(payload));
     let binary = "";
     bytes.forEach((b) => { binary += String.fromCharCode(b); });
@@ -2072,7 +2116,9 @@
     const padded = str.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(str.length / 4) * 4, "=");
     const binary = atob(padded);
     const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-    return JSON.parse(new TextDecoder().decode(bytes));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    dbg.share("decode", payload);
+    return payload;
   }
 
   function baseUrl() { return location.href.split("#")[0]; }
@@ -2083,6 +2129,7 @@
   // ─── RENDERING ─────────────────────────────────────────────────
 
   function render() {
+    dbg.state("render", { route: state.route, phase: state.quiz && state.quiz.phase, onboardingStep: state.onboardingStep });
     if (state.route === "profile") return renderResults();
     if (state.route === "compare") return renderCompare();
     if (state.route === "history") return renderHistory();
@@ -3512,6 +3559,7 @@
 
   function parseRoute() {
     const hash = location.hash.slice(1);
+    dbg.route("parse", { hash, current: state.route });
     if (!hash) {
       state.route = "quiz";
       state.quiz = null;
