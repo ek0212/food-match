@@ -3692,13 +3692,64 @@
     showToast(copied ? successMsg || "Copied!" : "Could not copy");
   }
 
+  // ─── DEBUG: URL state seeding ──────────────────────────────────
+  // Honors query params: ?route=, ?answers=, ?fixture=, ?seed=.
+  // Returns true if init should skip the normal hash-based parseRoute.
+
+  function parseQueryParams() {
+    const params = new URLSearchParams(location.search);
+    const route = params.get(ROUTE_PARAM);
+    const answersParam = params.get(ANSWERS_PARAM);
+    const fixture = params.get(FIXTURE_PARAM);
+    if (!route && !answersParam && !fixture) return false;
+
+    let answerSeq = [];
+    let restrictions = [];
+    if (answersParam) {
+      try { answerSeq = decodePayload(answersParam); }
+      catch (e) { console.warn("[debug] bad answers param:", e); return false; }
+    } else if (fixture) {
+      const fix = DEBUG_FIXTURES[fixture];
+      if (!fix) { console.warn("[debug] unknown fixture:", fixture); return false; }
+      answerSeq = fix.answers;
+      restrictions = fix.restrictions;
+    }
+
+    state.quiz = newQuiz("debug", restrictions);
+    state.onboardingComplete = true;
+
+    for (let i = 0; i < answerSeq.length; i++) {
+      if (!currentCard(state.quiz)) break;
+      if (state.quiz.phase === "done") break;
+      const entry = answerSeq[i];
+      const value = (entry && typeof entry === "object") ? entry.value : entry;
+      respondToCard(state.quiz, value);
+    }
+
+    const targetRoute = route === "results" ? "profile"
+      : (route || (answerSeq.length ? "profile" : "quiz"));
+
+    if ((targetRoute === "profile" || targetRoute === "compare")
+        && Object.keys(state.quiz.responses).length > 0) {
+      state.profile = buildProfile(state.quiz);
+    }
+
+    state.route = targetRoute;
+    history.replaceState(null, "", location.pathname + location.hash);
+    return true;
+  }
+
   // ─── INIT ──────────────────────────────────────────────────────
 
   try {
     epicure = await loadEpicure();
     const loading = document.querySelector(".loading");
     if (loading) loading.classList.add("hidden");
-    parseRoute();
+    if (parseQueryParams()) {
+      render();
+    } else {
+      parseRoute();
+    }
   } catch (e) {
     app.innerHTML = `
       <div class="shell">
