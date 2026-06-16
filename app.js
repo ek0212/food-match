@@ -2099,7 +2099,7 @@
   function renderOnboarding() {
     const step = Math.max(0, Math.min(state.onboardingStep, INTRO_STEP_COUNT - 1));
     shell(`
-      <section class="intro-layout" aria-label="Epicure introduction">
+      <section class="intro-layout" aria-label="App introduction">
         <div class="intro-main">
           <div class="intro-progress" aria-label="Intro step ${step + 1} of ${INTRO_STEP_COUNT}">
             ${Array.from({ length: INTRO_STEP_COUNT }, (_, i) => `
@@ -2123,14 +2123,9 @@
     if (step === 1) {
       return `
         <div class="intro-copy">
-          <div class="eyebrow">What this screen shows</div>
-          <h2>A big recipe study becomes a small taste quiz.</h2>
-          <p>Epicure read millions of recipes and found foods that show up together. Food Match keeps the parts that can become normal quiz questions.</p>
-          <div class="intro-facts">
-            ${factRow(DATASET_INGREDIENT_COUNT.toLocaleString(), "ingredient names")}
-            ${factRow(DATASET_MODE_COUNT, "food groups")}
-            ${factRow(DATASET_EDGE_COUNT, "ingredient pairs")}
-          </div>
+          <div class="eyebrow">What you get</div>
+          <h2>Your taste, mapped in two minutes.</h2>
+          <p>A picture of your favorite foods, your hard passes, a few worth trying next, and restaurant ideas you can send to anyone.</p>
         </div>
       `;
     }
@@ -2138,24 +2133,18 @@
     if (step === 2) {
       return `
         <div class="intro-copy">
-          <div class="eyebrow">Welcome</div>
-          <h2>Food Match turns food patterns into a taste scan.</h2>
-          <p>The app asks a fast yes, no, or unsure question. Each answer moves the path tracker and decides which food neighborhood comes next.</p>
-          <div class="intro-facts">
-            ${factRow("35", "preference questions")}
-            ${factRow("3", "question layers")}
-            ${factRow("2", "profiles can be compared")}
-          </div>
+          <div class="eyebrow">How to play</div>
+          <h2>Tap a button or use your keyboard.</h2>
+          <p>On phone, tap Yes, No, or Unsure. On a computer, press 1 for yes, 0 for no, or Space if you are unsure.</p>
         </div>
       `;
     }
 
     return `
       <div class="intro-copy">
-        <div class="eyebrow">Why Food Match exists</div>
-        <h2>Food taste is more specific than cuisine labels.</h2>
-        <p>Two people can both say they like Japanese food and still disagree on seaweed, spice, tofu, or fermented flavors. Restaurant planning needs more detail than a cuisine checkbox.</p>
-        <p>Epicure gives Food Match a starting point: foods that tend to appear together in real recipes. The app turns those patterns into questions, then uses your answers to suggest dishes, restaurants, and shared plans.</p>
+        <div class="eyebrow">Why use Food Match</div>
+        <h2>Find foods you both want to eat.</h2>
+        <p>Take a quick yes or no quiz on real ingredients. Share your result with a friend and see where your tastes line up.</p>
       </div>
     `;
   }
@@ -2164,36 +2153,43 @@
     if (step === 1) {
       return `
         <div>
-          <div class="section-label">Coverage snapshot</div>
-          <h3>Provenance is useful, but uneven.</h3>
+          <div class="section-label">What's in your result</div>
+          <h3>A short, useful map of your taste.</h3>
         </div>
-        ${renderProvenanceBars()}
-        <p class="intro-note">Food Match layers curated cuisine, dish, and ingredient logic over Epicure so smaller regions do not depend on one raw signal.</p>
+        <div class="flow-stack">
+          ${flowStep("\u{2764}", "Favorite flavors and dishes.")}
+          ${flowStep("\u{2715}", "Hard passes you want to avoid.")}
+          ${flowStep("?", "A few foods worth trying next.")}
+          ${flowStep("\u{1F37D}", "Restaurant and dish ideas to share.")}
+        </div>
       `;
     }
 
     if (step === 2) {
       return `
         <div>
-          <div class="section-label">What happens next</div>
-          <h3>Broad answer, branch, boundary check.</h3>
+          <div class="section-label">How to answer</div>
+          <h3>Two ways, whichever is faster.</h3>
         </div>
         <div class="flow-stack">
-          ${flowStep("1", "Press 1 for yes, 0 for no, or Space for unsure.")}
-          ${flowStep("2", "Watch the path tracker grow as the quiz branches.")}
-          ${flowStep("3", "Answer sharper ingredient probes at the edges.")}
-          ${flowStep("4", "Get restaurant, dish, and shared-match ideas.")}
+          ${flowStep("\u{1F4F1}", "On phone: tap the Yes, No, or Unsure button.")}
+          ${flowStep("1", "Press 1 for yes.")}
+          ${flowStep("0", "Press 0 for no.")}
+          ${flowStep("_", "Press Space if you are unsure.")}
         </div>
       `;
     }
 
     return `
       <div>
-        <div class="section-label">How Epicure becomes Food Match</div>
-        <h3>From recipe data to quiz questions.</h3>
+        <div class="section-label">How it works</div>
+        <h3>Short quiz, useful result.</h3>
       </div>
-      ${renderEpicureAnalysisBoard()}
-      <p class="intro-note">The motivation is practical: ask fewer, better food questions so the app can recommend what to try and where two people overlap.</p>
+      <div class="flow-stack">
+        ${flowStep("1", "Answer yes, no, or unsure to about 20 foods.")}
+        ${flowStep("2", "See a map of your taste with restaurant ideas.")}
+        ${flowStep("3", "Send the link to a friend and compare.")}
+      </div>
     `;
   }
 
