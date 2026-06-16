@@ -348,6 +348,31 @@
   let epicure = null;
   let keyboardInitialized = false;
 
+  // ─── SEEDED RNG (debug repro) ──────────────────────────────────
+  // Mulberry32: deterministic when ?seed=N is set, otherwise seeded
+  // from Date.now() so behavior matches Math.random() in production.
+
+  function mulberry32(seed) {
+    let s = seed >>> 0;
+    return function () {
+      s = (s + 0x6D2B79F5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  let _rngFn = null;
+  function dbgRng() {
+    if (!_rngFn) {
+      const seedParam = new URLSearchParams(location.search).get(SEED_PARAM);
+      const seed = seedParam ? (Number(seedParam) >>> 0) : Date.now();
+      _rngFn = mulberry32(seed);
+    }
+    return _rngFn();
+  }
+
   // ─── DATA LAYER ────────────────────────────────────────────────
 
   async function loadEpicure() {
@@ -1046,7 +1071,7 @@
   // ─── PROFILE ───────────────────────────────────────────────────
 
   function buildProfile(quiz) {
-    const id = "fm_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 7);
+    const id = "fm_" + Date.now().toString(36) + "_" + dbgRng().toString(36).slice(2, 7);
     return {
       v: VERSION,
       id,
