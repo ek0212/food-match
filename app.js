@@ -2652,7 +2652,7 @@
         <div class="complete-tracker" aria-label="Completed taste path">
           ${renderCompleteTracker(quiz, answeredCards)}
         </div>
-        <button class="btn btn-primary mt-16" data-action="show-results">Scroll to analysis</button>
+        <button class="btn btn-primary mt-16" data-action="show-results">See analysis</button>
       </section>
     `);
 
