@@ -1987,11 +1987,25 @@ input[type="text"]::placeholder {
 
 .path-tree-grouped > li.group {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+}
+
+.path-tree-grouped > li.group::before {
+  content: none;
+}
+
+.path-tree-grouped .group-children li {
+  grid-template-columns: 28px minmax(0, 1fr);
+  padding: 0;
+}
+
+.path-tree-grouped .group-children li::before {
+  content: none;
 }
 
 .path-tree-grouped .group-head {
