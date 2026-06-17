@@ -2223,7 +2223,7 @@
         </header>
         ${content}
         <footer class="footer">
-          Built on <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Epicure</a>, an open research dataset of ingredient pairings in real recipes.
+          Built on an <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">open research dataset</a> of ingredient pairings in real recipes.
         </footer>
         ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ""}
       </div>
@@ -2352,7 +2352,7 @@
 
   function renderEpicureAnalysisBoard() {
     return `
-      <div class="analysis-board" aria-label="Epicure dataset visual analysis">
+      <div class="analysis-board" aria-label="Recipe dataset visual analysis">
         ${renderDatasetFunnel()}
         ${renderModeKindMix()}
         ${renderModeSizeHistogram()}
@@ -2362,7 +2362,7 @@
 
   function renderDatasetFunnel() {
     const rows = [
-      { value: "4.14M", label: "recipes Epicure read", width: 100 },
+      { value: "4.14M", label: "recipes analyzed", width: 100 },
       { value: DATASET_EDGE_COUNT, label: "ingredient pairs found", width: 78 },
       { value: DATASET_INGREDIENT_COUNT.toLocaleString(), label: "ingredient names after cleanup", width: 50 },
       { value: DATASET_MODE_COUNT, label: "food groups learned", width: 32 },
@@ -2485,9 +2485,9 @@
     shell(`
       <section class="setup-layout">
         <div class="setup-copy">
-          <div class="eyebrow">Epicure-backed taste matching</div>
+          <div class="eyebrow">Recipe-map taste matching</div>
           <h2>Tell us about you, then start a 2-minute quiz.</h2>
-          <p>Epicure turns millions of recipes into a map of ingredients that tend to appear together. Food Match uses that map to ask better preference questions.</p>
+          <p>We turn millions of recipes into a map of ingredients that tend to appear together, then use that map to ask better preference questions.</p>
         </div>
 
         <div class="setup-panel">
