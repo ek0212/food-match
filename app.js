@@ -362,6 +362,8 @@
     onboardingStep: 0,
     onboardingComplete: false,
     toast: "",
+    routeStack: [],
+    lastRenderedRoute: null,
   };
 
   let epicure = null;
@@ -729,6 +731,30 @@
     };
   }
 
+  function backCard(quiz) {
+    if (!quiz || quiz.pos <= 0) return false;
+    quiz.pos--;
+    if (quiz.phase === "done") {
+      const card = quiz.queue[quiz.pos];
+      if (card) {
+        if (card.type === "cuisine") quiz.phase = "cuisines";
+        else if (card.type === "ingredient") quiz.phase = "ingredients";
+        else quiz.phase = "modes";
+      }
+    }
+    return true;
+  }
+
+  function forwardCard(quiz) {
+    if (!quiz) return false;
+    const max = quiz.maxPos || 0;
+    if (quiz.pos < max && quiz.pos + 1 <= quiz.queue.length) {
+      quiz.pos++;
+      return true;
+    }
+    return false;
+  }
+
   function respondToCard(quiz, value) {
     const card = currentCard(quiz);
     if (!card) return;
@@ -747,6 +773,7 @@
     }
 
     quiz.pos++;
+    quiz.maxPos = Math.max(quiz.maxPos || 0, quiz.pos);
 
     const answered = Object.keys(quiz.responses).length;
 
@@ -2226,6 +2253,11 @@
 
   function render() {
     dbg.state("render", { route: state.route, phase: state.quiz && state.quiz.phase, onboardingStep: state.onboardingStep });
+    if (state.lastRenderedRoute && state.route !== state.lastRenderedRoute) {
+      state.routeStack.push(state.lastRenderedRoute);
+      if (state.routeStack.length > 20) state.routeStack.shift();
+    }
+    state.lastRenderedRoute = state.route;
     if (state.route === "profile") return renderResults();
     if (state.route === "compare") return renderCompare();
     if (state.route === "history") return renderHistory();
@@ -2240,6 +2272,7 @@
     const onLanding = shouldShowOnboarding() || !state.quiz || state.quiz.phase === "setup";
     const onHistory = state.route === "history";
     const navButtons = [];
+    if (state.routeStack.length) navButtons.push(`<button data-action="nav-back" aria-label="Back to previous screen">&larr; Back</button>`);
     if (!onLanding) navButtons.push(`<button data-action="new-quiz">Retake</button>`);
     if (!onHistory) navButtons.push(`<button data-action="history">Profiles</button>`);
 
@@ -2633,6 +2666,10 @@
           </div>
           <div class="skip-row">
             <button class="btn btn-skip" data-answer="unknown"><kbd>Space</kbd><span>Unsure</span></button>
+          </div>
+          <div class="quiz-nav-row" aria-label="Question navigation">
+            <button class="btn btn-quiet" data-action="quiz-back" ${quiz.pos === 0 ? "disabled" : ""}>&larr; Back</button>
+            <button class="btn btn-quiet" data-action="quiz-forward" ${quiz.pos >= (quiz.maxPos || 0) ? "disabled" : ""}>Forward &rarr;</button>
           </div>
         </section>
 
@@ -3484,6 +3521,14 @@
         state.route = "history";
         render();
       }
+      if (action === "nav-back") {
+        if (state.routeStack.length) {
+          const prev = state.routeStack.pop();
+          state.route = prev;
+          state.lastRenderedRoute = prev;
+          render();
+        }
+      }
       if (action === "copy-prompt") {
         copyPromptFromButton(el);
       }
@@ -3558,6 +3603,19 @@
         handleAnswer(value);
       });
     });
+
+    const backBtn = document.querySelector('[data-action="quiz-back"]');
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        if (backCard(state.quiz)) renderQuizCard();
+      });
+    }
+    const forwardBtn = document.querySelector('[data-action="quiz-forward"]');
+    if (forwardBtn) {
+      forwardBtn.addEventListener("click", () => {
+        if (forwardCard(state.quiz)) renderQuizCard();
+      });
+    }
 
     initKeyboard();
   }

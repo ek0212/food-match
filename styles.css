@@ -1102,6 +1102,24 @@ input[type="text"]::placeholder {
   padding: 0 8px;
 }
 
+.quiz-nav-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.quiz-nav-row .btn {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+}
+
+.quiz-nav-row .btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .signal-panel p,
 .source-note,
 .panel-hint,
