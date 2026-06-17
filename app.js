@@ -1593,10 +1593,11 @@
       score += hits.length * 3;
       score -= misses.length * 4;
       score -= blockedCount * 3;
-      return { ...r, score, hits: hits.length, hitKeys: hits, misses: misses.length, missKeys: misses, blockedCount };
+      const topCuisineAffinity = r.cuisines.reduce((m, c) => Math.max(m, affinities[c] || 0), 0);
+      return { ...r, score, hits: hits.length, hitKeys: hits, misses: misses.length, missKeys: misses, blockedCount, topCuisineAffinity };
     })
     .filter(Boolean)
-    .filter((r) => r.score > 1 && (r.hits >= 1 || (r.cuisines.length > 0 && r.blockedCount === 0)))
+    .filter((r) => r.score >= 4 && (r.hits >= 2 || r.topCuisineAffinity >= 2))
     .sort((a, b) => b.score - a.score);
   }
 
