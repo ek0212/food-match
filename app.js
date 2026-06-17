@@ -2755,7 +2755,7 @@
       <section class="top-picks" aria-label="Your top picks at a glance">
         <div class="section-label">Top picks at a glance</div>
         <div class="top-picks-grid">
-          ${topPickTile("\u{1F30D}", "Top region", topCuisine ? topCuisine.label : "No clear region yet", topCuisine ? `${Math.round(topCuisine.score * 100)}% match` : "")}
+          ${topPickTile("\u{1F30D}", "Top region", topCuisine ? topCuisine.label : "No clear region yet", topCuisine ? cuisineBucket(topCuisine.score).label : "")}
           ${topPickTile("\u{1F37D}️", "Restaurant fit", topRestaurant ? topRestaurant.name : "No confident match yet", topRestaurant && topRestaurant.hitKeys && topRestaurant.hitKeys.length ? `${formatIngredientList(topRestaurant.hitKeys, 2)}` : "")}
           ${topPickTile("\u{1F374}", "Dish idea", topDish ? topDish.dish : "No confident match yet", topDish && topDish.hitKeys && topDish.hitKeys.length ? `${formatIngredientList(topDish.hitKeys, 2)}` : "")}
         </div>
