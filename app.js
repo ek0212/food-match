@@ -2645,16 +2645,10 @@
         </aside>
 
         <section class="question-panel">
-          <div class="question-topline">
-            <span>${cardTypeLabel(card)}</span>
-            ${card.meta ? `<span>${esc(card.meta)}</span>` : ""}
-          </div>
           ${cardVisual(card, 64)}
-          ${card.context ? `<div class="context">${contextPrefix(card.context)}${esc(card.context)}</div>` : ""}
           <h2>${esc(card.label)}</h2>
           <p class="desc">${esc(card.desc)}</p>
           ${card.samples ? renderSamples(card.samples) : ""}
-          <p class="evidence-note">${esc(cardEvidence(card))}</p>
 
           <div class="quiz-actions">
             ${ANSWER_OPTIONS.map((option) => `
