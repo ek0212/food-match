@@ -242,8 +242,8 @@
     oyster_mushroom: ["\u{1F344}", "Mild, velvety, slightly seafood-like", 2],
     coriander: ["\u{1F33F}", "Love-it-or-hate-it herb, bright and soapy to some", 5],
     lemongrass: ["\u{1F33F}", "Citrusy, fragrant Southeast Asian herb", 2],
-    galangal: ["\u{1FAD0}", "Ginger-like rhizome, sharp and piney", 3],
-    turmeric: ["\u{1FAD0}", "Earthy, golden, mildly bitter spice", 2],
+    galangal: ["\u{1FADA}", "Ginger-like rhizome, sharp and piney", 3],
+    turmeric: ["\u{1FADA}", "Earthy, golden, mildly bitter spice", 2],
     saffron: ["\u{1F33B}", "Floral, honey-like, world's most expensive spice", 2],
     cardamom: ["\u{1F33F}", "Intensely aromatic, slightly mentholated", 2],
     star_anise: ["\u2B50", "Sweet licorice-like warming spice", 3],
@@ -285,7 +285,7 @@
     nutritional_yeast: ["\u{1F9C0}", "Savory, cheesy-tasting deactivated yeast", 4],
     kombucha: ["\u{1F375}", "Fizzy fermented tea, tangy and vinegary", 4],
     pickled_cucumber: ["\u{1F952}", "Crunchy, sour, salty preserved cucumber", 2],
-    ginger: ["\u{1FAD0}", "Spicy, warming, zingy root", 1],
+    ginger: ["\u{1FADA}", "Spicy, warming, zingy root", 1],
     garlic: ["\u{1F9C4}", "Pungent, savory, essential aromatic", 1],
     sesame_oil: ["\u{1F9C8}", "Nutty, toasty, aromatic oil", 1],
     sriracha: ["\u{1F336}\uFE0F", "Garlicky, tangy hot sauce", 1],
@@ -2233,11 +2233,16 @@
 
   function render() {
     dbg.state("render", { route: state.route, phase: state.quiz && state.quiz.phase, onboardingStep: state.onboardingStep });
-    if (state.lastRenderedRoute && state.route !== state.lastRenderedRoute) {
+    const routeChanged = state.lastRenderedRoute && state.route !== state.lastRenderedRoute;
+    if (routeChanged) {
       state.routeStack.push(state.lastRenderedRoute);
       if (state.routeStack.length > 20) state.routeStack.shift();
     }
     state.lastRenderedRoute = state.route;
+    if (routeChanged) {
+      try { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }
+      catch { window.scrollTo(0, 0); }
+    }
     if (state.route === "profile") return renderResults();
     if (state.route === "compare") return renderCompare();
     if (state.route === "history") return renderHistory();
