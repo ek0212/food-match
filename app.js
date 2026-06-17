@@ -1711,12 +1711,7 @@
     const fringeRecipes = suggestFringeRecipes(profile).map((r) => r.title);
     const restrictions = promptRestrictionLabels(profile);
     const adventure = adventureBreakdown(profile);
-    const mapsQuery = buildMapsQuery([
-      "restaurants near me",
-      ...cuisines.slice(0, 3),
-      ...restaurants.slice(0, 2),
-      ...dishes.slice(0, 2),
-    ]);
+    const mapsQuery = personalMapsQuery(profile, cuisines, dishes);
 
     const text = [
       `I am looking for restaurants near me for ${name}. Use my current location in Google Maps or Ask Maps, then suggest specific places and explain why each one fits.`,
@@ -1757,13 +1752,7 @@
     const bridges = result.bridges.map((item) => item.label).slice(0, 10);
     const aCuisines = promptCuisineLabels(a, 3);
     const bCuisines = promptCuisineLabels(b, 3);
-    const mapsQuery = buildMapsQuery([
-      "restaurants near me for dinner",
-      ...sharedRestaurants.slice(0, 2),
-      ...sharedDishes.slice(0, 3),
-      ...aCuisines.slice(0, 1),
-      ...bCuisines.slice(0, 1),
-    ]);
+    const mapsQuery = sharedMapsQuery(a, b, aCuisines, bCuisines, sharedDishes);
 
     const text = [
       `Where should ${aName} and ${bName} go together? Use our current location in Google Maps or Ask Maps, then recommend restaurants that satisfy both profiles.`,
@@ -1831,7 +1820,52 @@
     return items.length ? items.join(", ") : fallback;
   }
 
-  function buildMapsQuery(parts) {
+  const MAPS_RESTRICTION_KEYWORDS = {
+    vegetarian: "vegetarian",
+    vegan: "vegan",
+    no_gluten: "gluten free",
+    no_dairy: "dairy free",
+  };
+
+  function mapsRestrictionPrefix(profile) {
+    const ids = profile && profile.restrictions ? profile.restrictions : [];
+    for (const id of ids) {
+      if (MAPS_RESTRICTION_KEYWORDS[id]) return MAPS_RESTRICTION_KEYWORDS[id];
+    }
+    return "";
+  }
+
+  function personalMapsQuery(profile, cuisines, dishes) {
+    const restriction = mapsRestrictionPrefix(profile);
+    let lead = "";
+    if (cuisines && cuisines.length) {
+      lead = cuisines.slice(0, 2).join(" or ");
+    } else if (dishes && dishes.length) {
+      lead = dishes[0];
+    } else {
+      lead = "highly rated";
+    }
+    return joinMapsParts([restriction, lead, "restaurants near me"]);
+  }
+
+  function sharedMapsQuery(a, b, aCuisines, bCuisines, sharedDishes) {
+    const restriction = mapsRestrictionPrefix(a) || mapsRestrictionPrefix(b);
+    const combinedCuisines = [];
+    (aCuisines || []).forEach((c) => { if (!combinedCuisines.includes(c)) combinedCuisines.push(c); });
+    (bCuisines || []).forEach((c) => { if (!combinedCuisines.includes(c)) combinedCuisines.push(c); });
+
+    let lead = "";
+    if (combinedCuisines.length) {
+      lead = combinedCuisines.slice(0, 2).join(" or ");
+    } else if (sharedDishes && sharedDishes.length) {
+      lead = sharedDishes[0];
+    } else {
+      lead = "highly rated";
+    }
+    return joinMapsParts([restriction, lead, "restaurants near me"]);
+  }
+
+  function joinMapsParts(parts) {
     return parts
       .filter(Boolean)
       .join(" ")
