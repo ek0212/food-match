@@ -133,6 +133,8 @@
       desc: "Steak frites, mac and cheese, roast chicken, charcuterie boards, sourdough. Rich, familiar, hearty." },
     { id: "Japanese", emoji: "\u{1F363}", label: "Dashi, raw fish & pickles",
       desc: "Sushi, ramen, miso soup, tempura, tsukemono, natto. Clean umami and precise textures." },
+    { id: "Eastern_European", emoji: "\u{1F963}", label: "Rye, dill & sour cream",
+      desc: "Pierogi, borscht, kasha, sauerkraut, paprikash, smoked sausage. Hearty, fermented, warming." },
   ];
 
   const CUISINE_DISPLAY = {
@@ -143,6 +145,7 @@
     Latin_American: "Latin American",
     Western_Atlantic: "Western / Comfort",
     Japanese: "Japanese",
+    Eastern_European: "Eastern European",
   };
 
   const CUISINE_EMOJI = {
@@ -153,6 +156,7 @@
     Latin_American: "\u{1F32E}",
     Western_Atlantic: "\u{1F354}",
     Japanese: "\u{1F363}",
+    Eastern_European: "\u{1F963}",
   };
 
   const CUISINE_KEYWORDS = {
@@ -163,6 +167,7 @@
     Latin_American: ["latin american", "mexican", "tex-mex", "latin", "new world", "oaxacan", "chile"],
     Western_Atlantic: ["western", "american", "european", "atlantic", "french", "british", "comfort", "cheese"],
     Japanese: ["japanese", "dashi", "miso", "sushi", "ramen"],
+    Eastern_European: ["eastern european", "eastern-european", "polish", "hungarian", "russian", "slavic", "ukrainian", "ashkenazi", "paprika", "dill", "rye", "sauerkraut"],
   };
 
   const TASTE_DIMENSION_LABELS = {
