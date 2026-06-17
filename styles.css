@@ -821,6 +821,26 @@ input[type="text"]::placeholder {
   background: #10120f;
 }
 
+.btn-cta {
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  font-weight: 950;
+  letter-spacing: 0.01em;
+}
+
+.btn-cta:hover {
+  background: #e8b53d;
+  transform: translateY(-2px);
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.btn-cta:active {
+  transform: translateY(0);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
 .btn-quiet,
 .btn-skip {
   background: rgba(255, 254, 250, 0.74);

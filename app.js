@@ -2248,7 +2248,7 @@
           </div>
           ${introMain(step)}
           <div class="intro-actions">
-            <button class="btn btn-primary" data-action="intro-next">${step === INTRO_STEP_COUNT - 1 ? "Start quiz" : "Next"}</button>
+            <button class="btn btn-cta" data-action="intro-next">${step === INTRO_STEP_COUNT - 1 ? "Start quiz" : "Next"}</button>
             <button class="btn btn-quiet" data-action="intro-skip">Skip intro</button>
           </div>
         </div>
@@ -2537,7 +2537,7 @@
           </div>
 
           <div class="setup-actions">
-            <button class="btn btn-primary" data-action="start-quiz">Start the quiz</button>
+            <button class="btn btn-cta" data-action="start-quiz">Start the quiz</button>
             <span>${profileCount ? `<button type="button" class="link-toggle" data-action="history">View ${profileCount} past result${profileCount === 1 ? "" : "s"}</button>` : "No saved profiles yet"}</span>
           </div>
         </div>
@@ -2656,7 +2656,7 @@
         <div class="complete-tracker" aria-label="Completed taste path">
           ${renderCompleteTracker(quiz, answeredCards)}
         </div>
-        <button class="btn btn-primary mt-16" data-action="show-results">See analysis</button>
+        <button class="btn btn-cta mt-16" data-action="show-results">See analysis</button>
       </section>
     `);
 
@@ -2792,7 +2792,7 @@
           <div class="section-label">Share</div>
           <h3>Compare with someone</h3>
           <div class="btn-row vertical">
-            <button class="btn btn-primary" data-action="share-invite">Invite to compare</button>
+            <button class="btn btn-cta" data-action="share-invite">Invite to compare</button>
             <button class="btn" data-action="share-profile">Copy profile link</button>
           </div>
         </div>
@@ -2923,7 +2923,7 @@
         </div>
 
         <div class="panel panel-actions">
-          <button class="btn btn-primary" data-action="share-compare">Share comparison</button>
+          <button class="btn btn-cta" data-action="share-compare">Share comparison</button>
           <button class="btn" data-action="new-quiz">Take quiz</button>
         </div>
       </section>
@@ -2951,7 +2951,7 @@
           </div>
         ` : `<div class="empty-state">No profiles yet.</div>`}
         <div class="btn-row mt-16">
-          <button class="btn btn-primary" data-action="new-quiz">New quiz</button>
+          <button class="btn" data-action="new-quiz">New quiz</button>
         </div>
       </section>
     `);
@@ -3412,7 +3412,7 @@
       <div class="prompt-card">
         <pre id="${esc(id)}" class="prompt-text">${esc(promptText)}</pre>
         <div class="prompt-actions">
-          <button class="btn btn-primary" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy prompt</button>
+          <button class="btn" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy prompt</button>
           <a class="btn" href="${esc(googleMapsSearchUrl(mapsQuery))}" target="_blank" rel="noopener">Open Google Maps search</a>
         </div>
       </div>
@@ -3424,7 +3424,7 @@
       <div class="prompt-card">
         <pre id="${esc(id)}" class="prompt-text">${esc(mapsQuery || "")}</pre>
         <div class="prompt-actions">
-          <button class="btn btn-primary" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
+          <button class="btn" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
           <a class="btn" href="${esc(googleMapsSearchUrl(mapsQuery))}" target="_blank" rel="noopener">Open in Google Maps</a>
         </div>
       </div>
@@ -3436,7 +3436,7 @@
       <div class="prompt-card">
         <pre id="${esc(id)}" class="prompt-text">${esc(promptText)}</pre>
         <div class="prompt-actions">
-          <button class="btn btn-primary" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
+          <button class="btn" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
         </div>
       </div>
     `;
