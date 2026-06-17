@@ -1102,6 +1102,36 @@ input[type="text"]::placeholder {
   padding: 0 8px;
 }
 
+.why-this {
+  margin: 10px auto 4px;
+  max-width: 56ch;
+  font-size: 0.84rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.why-this summary {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 254, 250, 0.6);
+  cursor: pointer;
+  font-weight: 850;
+  color: var(--muted);
+}
+
+.why-this[open] summary {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.why-this p {
+  margin: 10px auto 0;
+  max-width: 56ch;
+  line-height: 1.45;
+}
+
 .quiz-nav-row {
   display: flex;
   justify-content: space-between;

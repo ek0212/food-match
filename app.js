@@ -2584,6 +2584,11 @@
           <p class="desc">${esc(card.desc)}</p>
           ${card.samples ? renderSamples(card.samples) : ""}
 
+          <details class="why-this">
+            <summary>Why this question?</summary>
+            <p>${esc(whyThisCard(card, quiz))}</p>
+          </details>
+
           <div class="quiz-actions">
             ${ANSWER_OPTIONS.map((option) => `
               <button class="btn btn-${option.tone}" data-answer="${option.value}">
@@ -2980,6 +2985,49 @@
     if (card.type === "mode") return "Recipe pattern";
     if (card.type === "ingredient-probe") return "Branch check";
     return "Ingredient";
+  }
+
+  function whyThisCard(card, quiz) {
+    if (!card) return "";
+    if (card.type === "cuisine") {
+      return "Cuisine regions come first. Your yes/no on each region steers which recipe neighborhoods we ask about next.";
+    }
+    if (card.type === "mode") {
+      const likedCuisines = cuisinesWithResponse(quiz, (v) => typeof v === "number" && v > 0);
+      const passedCuisines = cuisinesWithResponse(quiz, (v) => typeof v === "number" && v < 0);
+      if (likedCuisines.length) {
+        return `Top recipe neighborhood after your yes to ${joinNatural(likedCuisines)}. Recipes in this group share ingredients that often appear together in cooking data.`;
+      }
+      if (passedCuisines.length) {
+        return `No clear yes on a region yet, so we pull from broad recipe neighborhoods while skipping ones tied to ${joinNatural(passedCuisines)}.`;
+      }
+      return "Highest-scoring recipe neighborhood from the default ranking. The first mode tends to be the one that splits the dataset best.";
+    }
+    if (card.type === "ingredient-probe") {
+      const branch = card.parentAnswer ? card.parentAnswer.replace(/_/g, " ") : "your last answer";
+      return `Branch probe from ${card.parentLabel || "the previous neighborhood"} (${branch}). We test specific ingredients so a broad answer does not overgeneralize.`;
+    }
+    if (card.type === "ingredient") {
+      return card.parentLabel
+        ? `Boundary check inside ${card.parentLabel}. Edge ingredients here help separate real dislikes from broad generalizations.`
+        : "Boundary ingredient that splits adjacent recipe clusters; your answer sharpens the recommendation edge.";
+    }
+    return cardEvidence(card);
+  }
+
+  function cuisinesWithResponse(quiz, predicate) {
+    if (!quiz || !quiz.responses) return [];
+    return CUISINES
+      .filter((c) => predicate(quiz.responses["c:" + c.id]))
+      .map((c) => CUISINE_DISPLAY[c.id] || c.label)
+      .slice(0, 3);
+  }
+
+  function joinNatural(items) {
+    if (!items.length) return "";
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return items[0] + " and " + items[1];
+    return items.slice(0, -1).join(", ") + ", and " + items[items.length - 1];
   }
 
   function cardEvidence(card) {
