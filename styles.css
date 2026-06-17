@@ -1148,6 +1148,23 @@ input[type="text"]::placeholder {
   padding: 0 8px;
 }
 
+.cta-frame {
+  margin-top: 14px;
+  padding: 14px;
+  border: 2px solid var(--yellow);
+  border-radius: var(--radius);
+  background: var(--yellow-soft);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.cta-frame .quiz-actions {
+  margin-top: 0;
+}
+
+.cta-frame .skip-row {
+  margin-top: 8px;
+}
+
 .why-this {
   margin: 10px auto 4px;
   max-width: 56ch;

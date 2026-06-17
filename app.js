@@ -73,6 +73,13 @@
   const CUISINE_DIRECT_WEIGHT = 2;
   const CUISINE_MODE_WEIGHT = 0.8;
   const CUISINE_INGREDIENT_WEIGHT = 0.25;
+  const QUIZ_TARGET = 35;
+  const MAPS_RESTRICTION_KEYWORDS = {
+    vegetarian: "vegetarian",
+    vegan: "vegan",
+    no_gluten: "gluten free",
+    no_dairy: "dairy free",
+  };
   const INGREDIENT_ALIASES = {
     bonito_flake: "bonito_flakes",
     brie: "brie_cheese",
@@ -651,8 +658,6 @@
   function currentCard(quiz) {
     return quiz.queue[quiz.pos] || null;
   }
-
-  const QUIZ_TARGET = 35;
 
   function quizProgress(quiz) {
     const answered = quiz.pos;
@@ -1781,13 +1786,6 @@
     return items.length ? items.join(", ") : fallback;
   }
 
-  const MAPS_RESTRICTION_KEYWORDS = {
-    vegetarian: "vegetarian",
-    vegan: "vegan",
-    no_gluten: "gluten free",
-    no_dairy: "dairy free",
-  };
-
   function mapsRestrictionPrefix(profile) {
     const ids = profile && profile.restrictions ? profile.restrictions : [];
     for (const id of ids) {
@@ -2588,16 +2586,18 @@
             <p>${esc(whyThisCard(card, quiz))}</p>
           </details>
 
-          <div class="quiz-actions">
-            ${ANSWER_OPTIONS.map((option) => `
-              <button class="btn btn-${option.tone}" data-answer="${option.value}">
-                <kbd>${option.key}</kbd>
-                <span>${esc(option.label)}</span>
-              </button>
-            `).join("")}
-          </div>
-          <div class="skip-row">
-            <button class="btn btn-skip" data-answer="unknown"><kbd>Space</kbd><span>Unsure</span></button>
+          <div class="cta-frame" aria-label="Answer this question">
+            <div class="quiz-actions">
+              ${ANSWER_OPTIONS.map((option) => `
+                <button class="btn btn-${option.tone}" data-answer="${option.value}">
+                  <kbd>${option.key}</kbd>
+                  <span>${esc(option.label)}</span>
+                </button>
+              `).join("")}
+            </div>
+            <div class="skip-row">
+              <button class="btn btn-skip" data-answer="unknown"><kbd>Space</kbd><span>Unsure</span></button>
+            </div>
           </div>
           <div class="quiz-nav-row" aria-label="Question navigation">
             <button class="btn btn-quiet" data-action="quiz-back" ${quiz.pos === 0 ? "disabled" : ""}>&larr; Back</button>
