@@ -44,9 +44,7 @@
   const DATASET_MODE_COUNT = 150;
   const DATASET_EDGE_COUNT = "203,508";
   const DATASET_TOTAL_RESOURCE_ROWS = "4,696";
-  const EPICURE_DATASET_URL = "https://huggingface.co/datasets/Kaikaku/epicure-corpus-resources";
   const EPICURE_PAPER_URL = "https://arxiv.org/abs/2605.22391";
-  const EPICURE_PAPER_TITLE = "Epicure: Navigating the Emergent Geometry of Food Ingredient Embeddings";
   const EPICURE_HELD_BACK_ASSETS = [
     { label: "The full recipe pages", detail: "The researchers counted patterns from 4.14M recipes, but the recipe text is not included." },
     { label: "The giant ingredient web", detail: "The public page tells us how big the web is, but not every connection is downloadable yet." },
@@ -2197,7 +2195,6 @@
     if (state.route === "profile") return renderResults();
     if (state.route === "compare") return renderCompare();
     if (state.route === "history") return renderHistory();
-    if (state.route === "corpus") return renderCorpus();
     if (shouldShowOnboarding()) return renderOnboarding();
     if (!state.quiz) return renderSetup();
     if (state.quiz.phase === "done") return finishQuiz();
@@ -2208,9 +2205,7 @@
   function shell(content) {
     const onLanding = shouldShowOnboarding() || !state.quiz || state.quiz.phase === "setup";
     const onHistory = state.route === "history";
-    const onCorpus = state.route === "corpus";
     const navButtons = [];
-    if (!onCorpus) navButtons.push(`<button data-action="corpus">Corpus</button>`);
     if (!onLanding) navButtons.push(`<button data-action="new-quiz">Retake</button>`);
     if (!onHistory) navButtons.push(`<button data-action="history">Profiles</button>`);
 
@@ -2480,123 +2475,6 @@
     `;
   }
 
-  function renderCorpus() {
-    shell(`
-      <section class="corpus-hero" aria-labelledby="corpus-title">
-        <div>
-          <div class="eyebrow">How Food Match learned</div>
-          <h2 id="corpus-title">Recipes became a taste map</h2>
-          <div class="corpus-visual-flow" aria-label="Recipes to taste quiz">
-            ${visualFlowStep("\u{1F4DA}", "Recipes")}
-            ${visualFlowArrow()}
-            ${visualFlowStep("\u{1F9ED}", "Food map")}
-            ${visualFlowArrow()}
-            ${visualFlowStep("\u{1F4AC}", "Quiz cards")}
-          </div>
-          <div class="corpus-actions">
-            <a class="btn btn-primary" href="${EPICURE_DATASET_URL}" target="_blank" rel="noopener">Open source data</a>
-            <a class="btn" href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Open research paper</a>
-          </div>
-        </div>
-        <div class="corpus-metrics" aria-label="Dataset scale">
-          ${corpusMetric(DATASET_INGREDIENT_COUNT.toLocaleString(), "food names")}
-          ${corpusMetric(DATASET_MODE_COUNT, "food groups")}
-          ${corpusMetric(DATASET_EDGE_COUNT, "pairings")}
-        </div>
-      </section>
-
-      <section class="corpus-grid">
-        <div class="panel panel-wide">
-          <div class="section-label">The source</div>
-          <h3>Three useful pieces</h3>
-          <div class="source-tiles" aria-label="Source data summary">
-            ${sourceTile("\u{1FAD2}", "Food names", "1,790")}
-            ${sourceTile("\u{1F9E9}", "Food groups", "150")}
-            ${sourceTile("\u2713", "Checked", "outside data")}
-          </div>
-        </div>
-
-        <div class="panel panel-wide">
-          <div class="section-label">The quiz</div>
-          <h3>Each answer branches the quiz</h3>
-          ${renderQuizFlowVisual()}
-        </div>
-
-        <div class="panel">
-          <div class="section-label">The final step</div>
-          <h3>The map suggests, you choose</h3>
-          <div class="choice-strip" aria-label="User choice">
-            <span class="map-chip">\u{1F9ED} map</span>
-            <span class="choice-arrow">-&gt;</span>
-            <span class="yes">\u2713 yes</span>
-            <span class="no">\u00D7 no</span>
-          </div>
-        </div>
-
-        <div class="panel panel-wide panel-full">
-          <div class="section-label">About the data</div>
-          <h3>Research basis</h3>
-          <p><strong>Epicure</strong> is a 2026 ingredient-embedding study that turns 4.14M recipes into 1,790 clean ingredient names.</p>
-          <p>Food Match uses the recipe-pairing view: ingredients are linked when cooks often use them together.</p>
-          <p>That makes the quiz a walk through learned ingredient neighborhoods, not a fixed cuisine checklist.</p>
-          <p><a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">${esc(EPICURE_PAPER_TITLE)}</a></p>
-        </div>
-      </section>
-    `);
-  }
-
-  function visualFlowStep(icon, label) {
-    return `
-      <span class="visual-flow-step">
-        <b>${esc(icon)}</b>
-        <small>${esc(label)}</small>
-      </span>
-    `;
-  }
-
-  function visualFlowArrow() {
-    return `<i class="visual-flow-arrow">-&gt;</i>`;
-  }
-
-  function corpusMetric(value, label) {
-    return `
-      <span class="corpus-metric">
-        <strong>${esc(value)}</strong>
-        <small>${esc(label)}</small>
-      </span>
-    `;
-  }
-
-  function sourceTile(icon, label, value) {
-    return `
-      <div class="source-tile">
-        <b>${esc(icon)}</b>
-        <strong>${esc(value)}</strong>
-        <span>${esc(label)}</span>
-      </div>
-    `;
-  }
-
-  function renderQuizFlowVisual() {
-    return `
-      <div class="quiz-flow-visual" aria-label="Taste quiz branching example">
-        <div class="quiz-node start">
-          <b>\u{1F4DD}</b>
-          <strong>Your answer</strong>
-        </div>
-        <div class="quiz-branches">
-          <span>nearby food</span>
-          <span>nearby flavor</span>
-          <span>nearby dish</span>
-        </div>
-        <div class="quiz-outcomes">
-          <span class="yes">yes -> show more</span>
-          <span class="no">no -> avoid</span>
-        </div>
-      </div>
-    `;
-  }
-
   function renderSetup() {
     const quiz = state.quiz || newQuiz("", []);
     state.quiz = quiz;
@@ -2604,27 +2482,12 @@
 
     const incoming = state.incomingProfile;
     const profileCount = loadProfiles().length;
-    const mosaicCuisines = CUISINES.slice(0, 4);
     shell(`
       <section class="setup-layout">
         <div class="setup-copy">
           <div class="eyebrow">Epicure-backed taste matching</div>
           <h2>Tell us about you, then start a 2-minute quiz.</h2>
           <p>Epicure turns millions of recipes into a map of ingredients that tend to appear together. Food Match uses that map to ask better preference questions.</p>
-
-          <div class="dataset-strip" aria-label="Recipe map summary">
-            ${statBlock(DATASET_INGREDIENT_COUNT.toLocaleString(), "ingredients")}
-            ${statBlock(DATASET_MODE_COUNT, "recipe patterns")}
-            ${statBlock(DATASET_EDGE_COUNT, "ingredient pairings")}
-          </div>
-
-          <div class="cuisine-mosaic" aria-label="Cuisine regions">
-            ${mosaicCuisines.map((c) => `
-              <div class="cuisine-tile">
-                <span>${esc(CUISINE_DISPLAY[c.id] || c.id)}</span>
-              </div>
-            `).join("")}
-          </div>
         </div>
 
         <div class="setup-panel">
@@ -3516,11 +3379,6 @@
         state.route = "history";
         render();
       }
-      if (action === "corpus") {
-        state.route = "corpus";
-        history.replaceState(null, "", baseUrl() + "#corpus");
-        render();
-      }
       if (action === "copy-prompt") {
         copyPromptFromButton(el);
       }
@@ -3698,10 +3556,6 @@
     }
 
     try {
-      if (hash === "corpus") {
-        state.route = "corpus";
-        return render();
-      }
       if (hash.startsWith("take=")) {
         state.incomingProfile = decodePayload(hash.slice(5));
         state.quiz = newQuiz("", []);
