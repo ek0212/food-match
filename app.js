@@ -2579,7 +2579,6 @@
           ${cardVisual(card, 64)}
           <h2>${esc(card.label)}</h2>
           <p class="desc">${esc(card.desc)}</p>
-          ${card.samples ? renderSamples(card.samples) : ""}
 
           <details class="why-this">
             <summary>Why this question?</summary>
@@ -2690,35 +2689,58 @@
     const namePossessive = profile.name ? esc(profile.name) + "'s" : "Your";
 
     const heroSummary = generateHeroSummary(profile);
+    const answersCount = Object.keys(profile.responses || {}).length;
+    const topCuisine = cuisineEvidence[0];
+    const topRestaurant = restaurants[0];
+    const topDish = dishes[0];
     shell(`
-      <section class="results-hero">
-        <div>
+      <section class="hero-v2">
+        <div class="hero-copy">
           <div class="eyebrow">${namePossessive} palate</div>
           <h2>${esc(heroSummary)}</h2>
           <p>${esc(narrative)}</p>
           <p class="hero-daylist"><em>${esc(daylist)}</em></p>
-        </div>
-        <div class="score-card">
-          <div class="score-dial">
-            <span>${adventure.score}</span>
-            <small>adventure score</small>
+          <div class="hero-cta-row">
+            <button class="btn btn-cta" data-action="share-invite">Invite a friend to compare</button>
+            <button class="btn" data-action="share-profile">Copy profile link</button>
           </div>
-          <div class="score-copy">
-            <strong>Adventure score</strong>
-            <span>${esc(adventureCopy(adventure))}</span>
-            <div class="score-math" aria-label="Adventure score evidence">
-              <span>${adventure.accepted} accepted</span>
-              <span>${adventure.neutral} neutral</span>
-              <span>${adventure.passed} passed</span>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat big">
+            <strong>${adventure.score}</strong>
+            <small>adventure score</small>
+            <em>${esc(adventureCopy(adventure))}</em>
+          </div>
+          <div class="hero-stat-row">
+            <div class="hero-stat">
+              <strong>${answersCount}</strong>
+              <small>answers mapped</small>
+            </div>
+            <div class="hero-stat">
+              <strong>${liked.length}</strong>
+              <small>strong likes</small>
+            </div>
+            <div class="hero-stat">
+              <strong>${disliked.length}</strong>
+              <small>hard passes</small>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="top-picks" aria-label="Your top picks at a glance">
+        <div class="section-label">Top picks at a glance</div>
+        <div class="top-picks-grid">
+          ${topPickTile("\u{1F30D}", "Top region", topCuisine ? topCuisine.label : "No clear region yet", topCuisine ? `${Math.round(topCuisine.score * 100)}% match` : "")}
+          ${topPickTile("\u{1F37D}️", "Restaurant fit", topRestaurant ? topRestaurant.name : "No confident match yet", topRestaurant && topRestaurant.hitKeys && topRestaurant.hitKeys.length ? `${formatIngredientList(topRestaurant.hitKeys, 2)}` : "")}
+          ${topPickTile("\u{1F374}", "Dish idea", topDish ? topDish.dish : "No confident match yet", topDish && topDish.hitKeys && topDish.hitKeys.length ? `${formatIngredientList(topDish.hitKeys, 2)}` : "")}
         </div>
       </section>
 
       <nav class="results-toc" aria-label="Jump to section">
         <a href="#section-taste">Your taste</a>
         <a href="#section-eat">Where to eat &amp; what to order</a>
-        <a href="#section-share">Share &amp; compare</a>
+        <a href="#section-share">Restaurant search prompts</a>
       </nav>
 
       <h3 class="results-section-heading" id="section-taste">Your taste</h3>
@@ -2785,20 +2807,11 @@
         </div>
       </section>
 
-      <h3 class="results-section-heading" id="section-share">Share &amp; compare</h3>
+      <h3 class="results-section-heading" id="section-share">Restaurant search prompts</h3>
       <section class="dashboard-grid">
-        <div class="panel panel-soft">
-          <div class="section-label">Share</div>
-          <h3>Compare with someone</h3>
-          <div class="btn-row vertical">
-            <button class="btn btn-cta" data-action="share-invite">Invite to compare</button>
-            <button class="btn" data-action="share-profile">Copy profile link</button>
-          </div>
-        </div>
-
         <div class="panel panel-wide panel-full panel-soft prompt-split">
           <div class="section-label">Find places near me</div>
-          <h3>Restaurant search prompts</h3>
+          <h3>Send these to Maps or ChatGPT</h3>
           <div class="prompt-split-grid">
             <div class="prompt-split-card">
               <div class="section-label">For Google Maps</div>
@@ -3368,6 +3381,19 @@
       return `<div class="empty-state">No clear flavor center yet. Answer a few recipe-pattern or ingredient questions to build this out.</div>`;
     }
     return `<div class="taste-bars">${rows.join("")}</div>`;
+  }
+
+  function topPickTile(emoji, label, value, sub) {
+    return `
+      <div class="top-pick">
+        <div class="top-pick-emoji" aria-hidden="true">${emoji}</div>
+        <div class="top-pick-body">
+          <small>${esc(label)}</small>
+          <strong>${esc(value)}</strong>
+          ${sub ? `<span>${esc(sub)}</span>` : ""}
+        </div>
+      </div>
+    `;
   }
 
   function renderRestaurantCard(r, opts) {

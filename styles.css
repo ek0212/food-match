@@ -841,6 +841,173 @@ input[type="text"]::placeholder {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+.hero-v2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 18px;
+  align-items: stretch;
+  margin-bottom: 18px;
+  padding: 28px 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--surface), rgba(255, 243, 207, 0.55) 60%, rgba(227, 243, 234, 0.55));
+  box-shadow: var(--shadow);
+}
+
+.hero-v2 .hero-copy {
+  display: grid;
+  align-content: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hero-v2 .hero-copy h2 {
+  max-width: 22ch;
+  font-size: 2.6rem;
+  line-height: 1.02;
+  font-weight: 950;
+}
+
+.hero-v2 .hero-copy p {
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.hero-v2 .hero-daylist {
+  font-size: 0.92rem;
+}
+
+.hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.hero-stats {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  min-width: 0;
+}
+
+.hero-stat {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 254, 250, 0.86);
+}
+
+.hero-stat strong {
+  font-size: 1.6rem;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.hero-stat small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hero-stat em {
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.hero-stat.big {
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.hero-stat.big strong {
+  font-size: 2.8rem;
+}
+
+.hero-stat.big small {
+  color: var(--ink);
+}
+
+.hero-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.top-picks {
+  margin-bottom: 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.top-picks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.top-pick {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 254, 250, 0.86);
+}
+
+.top-pick-emoji {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--yellow-soft);
+  font-size: 1.8rem;
+}
+
+.top-pick-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.top-pick-body small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.top-pick-body strong {
+  font-size: 0.98rem;
+  line-height: 1.2;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
+.top-pick-body span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .maps-card {
   display: grid;
   gap: 12px;
@@ -2322,7 +2489,10 @@ input[type="text"]::placeholder {
   .intro-layout,
   .setup-layout,
   .quiz-layout,
-  .dashboard-grid {
+  .dashboard-grid,
+  .hero-v2,
+  .top-picks-grid,
+  .hero-stat-row {
     grid-template-columns: 1fr;
   }
 
