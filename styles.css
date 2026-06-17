@@ -517,6 +517,11 @@ button.brand-lockup:hover .brand-mark {
   align-items: stretch;
 }
 
+.setup-layout-solo {
+  grid-template-columns: minmax(0, 560px);
+  justify-content: center;
+}
+
 .setup-copy,
 .setup-panel,
 .question-panel,
@@ -582,67 +587,37 @@ button.brand-lockup:hover .brand-mark {
   background: rgba(255, 254, 250, 0.76);
 }
 
-.how-it-works {
-  display: grid;
-  gap: 10px;
-  margin-top: auto;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(255, 254, 250, 0.72);
+.intro-red,
+.flow-step .intro-red,
+.intro-copy p .intro-red {
+  color: var(--red);
+  font-weight: 900;
 }
 
-.how-steps {
-  display: grid;
-  gap: 10px;
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
+.intro-copy a {
+  color: var(--green);
+  font-weight: 700;
 }
 
-.how-steps li {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-
-.how-steps li b {
+.intro-help {
   display: inline-grid;
-  width: 26px;
-  height: 26px;
   place-items: center;
-  border: 1px solid var(--ink);
+  width: 36px;
+  height: 36px;
+  margin-left: 8px;
+  padding: 0;
+  border: 1px solid var(--line);
   border-radius: 50%;
   background: var(--surface);
-  font-size: 0.78rem;
-  font-weight: 950;
-}
-
-.how-steps li strong {
-  display: block;
-  font-size: 0.92rem;
-  line-height: 1.2;
-}
-
-.how-steps li span {
-  display: block;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.35;
-}
-
-.how-footnote {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.how-footnote a {
-  color: var(--green);
+  color: var(--ink);
+  font-size: 1rem;
   font-weight: 900;
+  cursor: pointer;
+}
+
+.intro-help:hover {
+  border-color: var(--ink);
+  background: rgba(255, 254, 250, 0.9);
 }
 
 .stat-block strong {
@@ -934,6 +909,13 @@ input[type="text"]::placeholder {
   font-size: 2.8rem;
 }
 
+.hero-stat.big strong.hero-stat-label {
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+
 .hero-stat.big small {
   color: var(--ink);
 }
@@ -1016,6 +998,21 @@ input[type="text"]::placeholder {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(255, 254, 250, 0.74);
+  align-content: start;
+}
+
+.maps-card .btn-cta {
+  padding: 10px 16px;
+  font-size: 0.95rem;
+}
+
+.maps-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
 }
 
 .maps-query {
@@ -1251,6 +1248,22 @@ input[type="text"]::placeholder {
   min-height: 62px;
   padding: 10px 8px;
   font-size: 0.95rem;
+}
+
+.intro-copy kbd {
+  display: inline-grid;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  place-items: center;
+  margin: 0 2px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: rgba(255, 254, 250, 0.78);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+  color: var(--ink);
 }
 
 .quiz-actions kbd,
@@ -1747,12 +1760,14 @@ input[type="text"]::placeholder {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 12px;
+  align-items: start;
 }
 
 .prompt-split-card {
   display: grid;
   gap: 8px;
   min-width: 0;
+  align-self: start;
 }
 
 .hint-block {
@@ -1901,6 +1916,35 @@ input[type="text"]::placeholder {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.cuisine-bucket-caption {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 4px 0 6px;
+  line-height: 1.35;
+}
+
+.taste-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.taste-summary-line {
+  color: var(--muted);
+}
+
+.taste-summary-line.dominant {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.taste-summary-line.dim {
+  opacity: 0.7;
 }
 
 .signal-parts span {

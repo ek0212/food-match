@@ -9,6 +9,7 @@
   // ─── CONSTANTS ─────────────────────────────────────────────────
 
   const STORAGE_KEY = "food-match-v3";
+  const INTRO_SEEN_KEY = "food-match-intro-seen";
   const VERSION = 3;
   const MAX_PROFILES = 12;
   // ─── DEBUG (developer-only) ────────────────────────────────────
@@ -51,7 +52,8 @@
     { label: "A region tag for every food", detail: "The dataset does not say that every ingredient belongs to one cuisine region." },
     { label: "Hidden training pieces", detail: "Some internal training details are kept out of the public file because this app does not need them." },
   ];
-  const INTRO_STEP_COUNT = 3;
+  const INTRO_STEP_COUNT = 4;
+  const EPICURE_PAPER_DATE = "May 2026";
   const ANSWER_OPTIONS = [
     { value: 1, key: "1", label: "Yes", tone: "r4" },
     { value: -1, key: "0", label: "No", tone: "r1" },
@@ -73,6 +75,19 @@
   const CUISINE_DIRECT_WEIGHT = 2;
   const CUISINE_MODE_WEIGHT = 0.8;
   const CUISINE_INGREDIENT_WEIGHT = 0.25;
+  const ADVENTURE_BUCKETS = [
+    { max: 25, label: "Cautious", caption: "You stick to the familiar." },
+    { max: 55, label: "Curious", caption: "Open to trying, picky about what." },
+    { max: 80, label: "Bold", caption: "Actively seeks new flavors." },
+    { max: 100, label: "Wild", caption: "Loves the divisive stuff." },
+  ];
+  const CUISINE_BUCKETS = [
+    { min: 3, label: "Strong lean", caption: "You consistently picked this region's foods." },
+    { min: 1, label: "Mild lean", caption: "Some signal here, not your top region." },
+    { min: -1, label: "Neutral", caption: "Few cues either way." },
+    { min: -Infinity, label: "Avoid", caption: "You passed on most foods from this region." },
+  ];
+  const TASTE_QUIET_THRESHOLD = 3;
   const QUIZ_TARGET = 35;
   const MAPS_RESTRICTION_KEYWORDS = {
     vegetarian: "vegetarian",
@@ -363,7 +378,7 @@
     compareProfiles: null,
     incomingProfile: null,
     onboardingStep: 0,
-    onboardingComplete: false,
+    onboardingComplete: (() => { try { return localStorage.getItem(INTRO_SEEN_KEY) === "1"; } catch { return false; } })(),
     toast: "",
     routeStack: [],
     lastRenderedRoute: null,
@@ -1311,6 +1326,30 @@
     return sig;
   }
 
+  function adventureBucket(score) {
+    return ADVENTURE_BUCKETS.find((b) => score <= b.max) || ADVENTURE_BUCKETS[ADVENTURE_BUCKETS.length - 1];
+  }
+
+  function cuisineBucket(score) {
+    return CUISINE_BUCKETS.find((b) => score >= b.min) || CUISINE_BUCKETS[CUISINE_BUCKETS.length - 1];
+  }
+
+  function tasteSummary(taste) {
+    const entries = Object.entries(taste)
+      .map(([key, value]) => ({ key, value, label: TASTE_DIMENSION_LABELS[key] || key }))
+      .filter((e) => e.value > 0)
+      .sort((a, b) => b.value - a.value);
+    if (!entries.length) return null;
+    const dominant = entries[0];
+    const secondary = entries.slice(1, 3).filter((e) => e.value > TASTE_QUIET_THRESHOLD);
+    const quiet = entries.slice(1).filter((e) => e.value <= TASTE_QUIET_THRESHOLD);
+    return {
+      dominant: `Your strongest: ${dominant.label.toLowerCase()}`,
+      secondary: secondary.length ? `Backed by: ${secondary.map((e) => e.label.toLowerCase()).join(", ")}` : null,
+      quiet: quiet.length ? `Light on: ${quiet.map((e) => e.label.toLowerCase()).join(", ")}` : null,
+    };
+  }
+
   function topResponses(profile, filter) {
     return Object.entries(profile.responses)
       .filter(([id, value]) => filter(id, value))
@@ -1688,7 +1727,7 @@
       `- Flavor center: ${formatPromptList(taste, "No clear flavor center yet")}.`,
       `- Foods I want to avoid or treat carefully: ${formatPromptList(disliked, "No hard passes captured")}.`,
       `- Dietary boundaries: ${formatPromptList(restrictions, "No restrictions")}.`,
-      `- Adventure level: ${adventure.score}/100. ${adventureSummary(adventure)}`,
+      `- Adventure level: ${adventureBucket(adventure.score).label} — ${adventureBucket(adventure.score).caption} ${adventureCopy(adventure)}`,
       "",
       "Things I am excited to try:",
       `- Dish directions: ${formatPromptList(dishes, "Use the cuisine and ingredient signals instead")}.`,
@@ -2156,6 +2195,16 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles.slice(0, MAX_PROFILES)));
   }
 
+  function hasSeenIntro() {
+    try { return localStorage.getItem(INTRO_SEEN_KEY) === "1"; }
+    catch { return false; }
+  }
+
+  function markIntroSeen() {
+    try { localStorage.setItem(INTRO_SEEN_KEY, "1"); }
+    catch { /* storage unavailable */ }
+  }
+
   // ─── URL ENCODING ─────────────────────────────────────────────
 
   function encodePayload(payload) {
@@ -2260,9 +2309,9 @@
     if (step === 1) {
       return `
         <div class="intro-copy">
-          <div class="eyebrow">What you get</div>
-          <h2>Your taste, mapped in two minutes.</h2>
-          <p>A picture of your favorite foods, your hard passes, a few worth trying next, and restaurant ideas you can send to anyone.</p>
+          <div class="eyebrow">How to play</div>
+          <h2>Yes, No, or Unsure.</h2>
+          <p>Tap, or press <kbd>1</kbd> / <kbd>0</kbd> / <kbd>Space</kbd>.</p>
         </div>
       `;
     }
@@ -2270,18 +2319,28 @@
     if (step === 2) {
       return `
         <div class="intro-copy">
-          <div class="eyebrow">How to play</div>
-          <h2>Tap a button or use your keyboard.</h2>
-          <p>On phone, tap Yes, No, or Unsure. On a computer, press 1 for yes, 0 for no, or Space if you are unsure.</p>
+          <div class="eyebrow">How it works</div>
+          <h2>Built on a recipe map.</h2>
+          <p>From <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener"><span class="intro-red">Epicure</span></a> (${EPICURE_PAPER_DATE}): 4.14M recipes &rarr; 1,790 ingredients in 150 neighborhoods.</p>
+        </div>
+      `;
+    }
+
+    if (step === 3) {
+      return `
+        <div class="intro-copy">
+          <div class="eyebrow">What you get</div>
+          <h2>Your taste, mapped.</h2>
+          <p>Loves, passes, things to try, restaurants to share, friend compatibility.</p>
         </div>
       `;
     }
 
     return `
       <div class="intro-copy">
-        <div class="eyebrow">Why use Food Match</div>
+        <div class="eyebrow">Why</div>
         <h2>Find foods you both want to eat.</h2>
-        <p>Take a quick yes or no quiz on real ingredients. Share your result with a friend and see where your tastes line up.</p>
+        <p>Quick yes/no quiz. Share with a friend, compare tastes.</p>
       </div>
     `;
   }
@@ -2289,43 +2348,41 @@
   function introSide(step) {
     if (step === 1) {
       return `
-        <div>
-          <div class="section-label">What's in your result</div>
-          <h3>A short, useful map of your taste.</h3>
-        </div>
         <div class="flow-stack">
-          ${flowStep("\u{2764}", "Favorite flavors and dishes.")}
-          ${flowStep("\u{2715}", "Hard passes you want to avoid.")}
-          ${flowStep("?", "A few foods worth trying next.")}
-          ${flowStep("\u{1F37D}", "Restaurant and dish ideas to share.")}
+          ${flowStep("1", "Yes")}
+          ${flowStep("0", "No")}
+          ${flowStep("_", "Unsure")}
         </div>
       `;
     }
 
     if (step === 2) {
       return `
-        <div>
-          <div class="section-label">How to answer</div>
-          <h3>Two ways, whichever is faster.</h3>
-        </div>
         <div class="flow-stack">
-          ${flowStep("\u{1F4F1}", "On phone: tap the Yes, No, or Unsure button.")}
-          ${flowStep("1", "Press 1 for yes.")}
-          ${flowStep("0", "Press 0 for no.")}
-          ${flowStep("_", "Press Space if you are unsure.")}
+          <div class="flow-step"><b>1</b><span>Cuisines first: pick <span class="intro-red">recipe families</span>.</span></div>
+          <div class="flow-step"><b>2</b><span>Yes pulls in a neighborhood; no fences it off.</span></div>
+          <div class="flow-step"><b>3</b><span><span class="intro-red">Edge ingredients</span> separate dislikes from generalizations.</span></div>
+        </div>
+      `;
+    }
+
+    if (step === 3) {
+      return `
+        <div class="flow-stack">
+          ${flowStep("\u{2764}", "Loves")}
+          ${flowStep("\u{2715}", "Hard passes")}
+          ${flowStep("?", "Worth trying")}
+          ${flowStep("\u{1F37D}", "Restaurant ideas")}
+          ${flowStep("\u{1F465}", "Friend compatibility")}
         </div>
       `;
     }
 
     return `
-      <div>
-        <div class="section-label">How it works</div>
-        <h3>Short quiz, useful result.</h3>
-      </div>
       <div class="flow-stack">
-        ${flowStep("1", "Answer yes, no, or unsure to about 20 foods.")}
-        ${flowStep("2", "See a map of your taste with restaurant ideas.")}
-        ${flowStep("3", "Send the link to a friend and compare.")}
+        ${flowStep("1", "Answer ~20 foods.")}
+        ${flowStep("2", "See your taste map.")}
+        ${flowStep("3", "Send to a friend.")}
       </div>
     `;
   }
@@ -2481,41 +2538,7 @@
     const incoming = state.incomingProfile;
     const profileCount = loadProfiles().length;
     shell(`
-      <section class="setup-layout">
-        <div class="setup-copy">
-          <div class="eyebrow">Recipe-map taste matching</div>
-          <h2>Tell us about you, then start a 2-minute quiz.</h2>
-          <p>We start from a research dataset of 4.14M cooking recipes that links ingredients which tend to appear together. That gives us 1,790 ingredient names grouped into 150 recipe "neighborhoods".</p>
-
-          <div class="how-it-works" aria-label="How the quiz picks questions">
-            <div class="section-label">How the quiz picks questions</div>
-            <ol class="how-steps">
-              <li>
-                <b>1</b>
-                <div>
-                  <strong>Cuisines first</strong>
-                  <span>You answer yes/no on broad regions so we know which recipe families to follow.</span>
-                </div>
-              </li>
-              <li>
-                <b>2</b>
-                <div>
-                  <strong>Recipe neighborhoods</strong>
-                  <span>We ask about groups of ingredients that show up together. A "yes" pulls in more probes from that neighborhood; a "no" puts a guardrail on it.</span>
-                </div>
-              </li>
-              <li>
-                <b>3</b>
-                <div>
-                  <strong>Ingredient boundary checks</strong>
-                  <span>We test edge ingredients to separate real dislikes from broad generalizations.</span>
-                </div>
-              </li>
-            </ol>
-            <p class="how-footnote">Each yes/no changes what we ask next, so the quiz branches as you go.<br><a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Read the research paper</a></p>
-          </div>
-        </div>
-
+      <section class="setup-layout setup-layout-solo">
         <div class="setup-panel">
           ${incoming ? `<div class="notice">Comparing with ${esc(incoming.name || "someone")}</div>` : ""}
           <div class="section-label">About you</div>
@@ -2535,6 +2558,7 @@
 
           <div class="setup-actions">
             <button class="btn btn-cta" data-action="start-quiz">Start the quiz</button>
+            <button type="button" class="intro-help" data-action="view-intro" aria-label="View intro again">?</button>
             <span>${profileCount ? `<button type="button" class="link-toggle" data-action="history">View ${profileCount} past result${profileCount === 1 ? "" : "s"}</button>` : "No saved profiles yet"}</span>
           </div>
         </div>
@@ -2707,9 +2731,9 @@
         </div>
         <div class="hero-stats">
           <div class="hero-stat big">
-            <strong>${adventure.score}</strong>
-            <small>adventure score</small>
-            <em>${esc(adventureCopy(adventure))}</em>
+            <strong class="hero-stat-label">${esc(adventureBucket(adventure.score).label)}</strong>
+            <small>adventure level</small>
+            <em>${esc(adventureBucket(adventure.score).caption)} ${esc(adventureCopy(adventure))}</em>
           </div>
           <div class="hero-stat-row">
             <div class="hero-stat">
@@ -3302,6 +3326,7 @@
     const renderCard = (row) => {
       const clusterLabel = contributionLabel(row.cluster);
       const ingredientLabel = contributionLabel(row.ingredient);
+      const bucket = cuisineBucket(row.score);
       const parts = [];
       if (row.direct != null) parts.push(`<span>From cuisine answer: ${esc(answerLabel(row.direct))}</span>`);
       if (clusterLabel !== "No signal") parts.push(`<span>From related groups: ${esc(clusterLabel)}</span>`);
@@ -3310,8 +3335,9 @@
         <div class="cuisine-card ${cuisineTone(row)}">
           <div class="cuisine-card-top">
             <strong>${esc(row.label)}</strong>
-            <span>${esc(cuisineSignalLabel(row.score))}</span>
+            <span>${esc(bucket.label)}</span>
           </div>
+          <div class="cuisine-bucket-caption">${esc(bucket.caption)}</div>
           ${parts.length ? `<div class="signal-parts">${parts.join("")}</div>` : ""}
         </div>
       `;
@@ -3380,7 +3406,15 @@
     if (!rows.length) {
       return `<div class="empty-state">No clear flavor center yet. Answer a few recipe-pattern or ingredient questions to build this out.</div>`;
     }
-    return `<div class="taste-bars">${rows.join("")}</div>`;
+    const summary = tasteSummary(taste);
+    const summaryBlock = summary ? `
+      <div class="taste-summary">
+        <div class="taste-summary-line dominant">${esc(summary.dominant)}</div>
+        ${summary.secondary ? `<div class="taste-summary-line">${esc(summary.secondary)}</div>` : ""}
+        ${summary.quiet ? `<div class="taste-summary-line dim">${esc(summary.quiet)}</div>` : ""}
+      </div>
+    ` : "";
+    return `${summaryBlock}<div class="taste-bars">${rows.join("")}</div>`;
   }
 
   function topPickTile(emoji, label, value, sub) {
@@ -3448,6 +3482,7 @@
     const query = mapsQuery || "restaurants near me";
     return `
       <div class="maps-card">
+        <p class="maps-hint">Search Google Maps for:</p>
         <p class="maps-query"><span id="${esc(id)}">${esc(query)}</span></p>
         <a class="btn btn-cta" href="${esc(googleMapsSearchUrl(query))}" target="_blank" rel="noopener">Open in Google Maps &rarr;</a>
       </div>
@@ -3497,12 +3532,20 @@
         } else {
           state.onboardingComplete = true;
           state.onboardingStep = INTRO_STEP_COUNT;
+          markIntroSeen();
         }
         render();
       }
       if (action === "intro-skip") {
         state.onboardingComplete = true;
         state.onboardingStep = INTRO_STEP_COUNT;
+        markIntroSeen();
+        render();
+      }
+      if (action === "view-intro") {
+        state.onboardingComplete = false;
+        state.onboardingStep = 0;
+        state.route = "quiz";
         render();
       }
       if (action === "new-quiz") {
