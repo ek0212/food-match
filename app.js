@@ -2487,7 +2487,35 @@
         <div class="setup-copy">
           <div class="eyebrow">Recipe-map taste matching</div>
           <h2>Tell us about you, then start a 2-minute quiz.</h2>
-          <p>We turn millions of recipes into a map of ingredients that tend to appear together, then use that map to ask better preference questions.</p>
+          <p>We start from a research dataset of 4.14M cooking recipes that links ingredients which tend to appear together. That gives us 1,790 ingredient names grouped into 150 recipe "neighborhoods".</p>
+
+          <div class="how-it-works" aria-label="How the quiz picks questions">
+            <div class="section-label">How the quiz picks questions</div>
+            <ol class="how-steps">
+              <li>
+                <b>1</b>
+                <div>
+                  <strong>Cuisines first</strong>
+                  <span>You answer yes/no on broad regions so we know which recipe families to follow.</span>
+                </div>
+              </li>
+              <li>
+                <b>2</b>
+                <div>
+                  <strong>Recipe neighborhoods</strong>
+                  <span>We ask about groups of ingredients that show up together. A "yes" pulls in more probes from that neighborhood; a "no" puts a guardrail on it.</span>
+                </div>
+              </li>
+              <li>
+                <b>3</b>
+                <div>
+                  <strong>Ingredient boundary checks</strong>
+                  <span>We test edge ingredients to separate real dislikes from broad generalizations.</span>
+                </div>
+              </li>
+            </ol>
+            <p class="how-footnote">Each yes/no changes what we ask next, so the quiz branches as you go.<br><a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">Read the research paper</a></p>
+          </div>
         </div>
 
         <div class="setup-panel">
@@ -3118,19 +3146,62 @@
 
   function renderCompleteTracker(quiz, answeredCards) {
     const cards = answeredCards || answeredQuizCards(quiz);
-    return `
-      <ol>
-        ${cards.map((card, index) => {
-          const stateInfo = treeState(quiz.responses[card.id], false);
-          return `
-            <li class="${stateInfo.key}">
-              <span>${index + 1}</span>
-              <strong>${esc(card.label)}</strong>
-            </li>
-          `;
-        }).join("")}
-      </ol>
-    `;
+    const groups = groupAnsweredCards(cards);
+    const groupHtml = groups.map((group) => {
+      const parent = group.parent;
+      const parentState = treeState(quiz.responses[parent.card.id], false);
+      const branchSuffix = parent.card.type === "mode" ? branchAnswerLabel(quiz.responses[parent.card.id]) : null;
+      const parentMeta = branchSuffix
+        ? `${cardTypeLabel(parent.card)} · ${branchSuffix}`
+        : cardTypeLabel(parent.card);
+
+      const childrenHtml = group.children.length
+        ? `<ol class="group-children">${group.children.map((child) => {
+            const childState = treeState(quiz.responses[child.card.id], false);
+            return `
+              <li class="${childState.key}">
+                <span>${child.index + 1}</span>
+                <div>
+                  <strong>${esc(child.card.label)}</strong>
+                  <small>↳ probe from ${esc(parent.card.label)}</small>
+                </div>
+              </li>
+            `;
+          }).join("")}</ol>`
+        : "";
+
+      return `
+        <li class="group ${parentState.key} group-${parent.card.type}">
+          <div class="group-head">
+            <span>${parent.index + 1}</span>
+            <div>
+              <strong>${esc(parent.card.label)}</strong>
+              <small>${esc(parentMeta)}</small>
+            </div>
+          </div>
+          ${childrenHtml}
+        </li>
+      `;
+    }).join("");
+
+    return `<ol class="path-tree-grouped">${groupHtml}</ol>`;
+  }
+
+  function groupAnsweredCards(cards) {
+    const groups = [];
+    const groupByParentId = new Map();
+    cards.forEach((card, index) => {
+      if (card.type === "ingredient-probe" && card.parentId && groupByParentId.has(card.parentId)) {
+        groupByParentId.get(card.parentId).children.push({ card, index });
+        return;
+      }
+      const group = { parent: { card, index }, children: [] };
+      groups.push(group);
+      if (card.type === "mode") {
+        groupByParentId.set("m:" + card.modeId, group);
+      }
+    });
+    return groups;
   }
 
   function treeState(value, isActive) {

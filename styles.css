@@ -537,7 +537,7 @@ button.brand-lockup:hover .brand-mark {
 .setup-copy {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 22px;
   min-height: 640px;
   padding: 38px;
   overflow: hidden;
@@ -580,6 +580,69 @@ button.brand-lockup:hover .brand-mark {
   border: 1px solid rgba(32, 35, 31, 0.16);
   border-radius: var(--radius);
   background: rgba(255, 254, 250, 0.76);
+}
+
+.how-it-works {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 254, 250, 0.72);
+}
+
+.how-steps {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.how-steps li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.how-steps li b {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--ink);
+  border-radius: 50%;
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.how-steps li strong {
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.how-steps li span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.how-footnote {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.how-footnote a {
+  color: var(--green);
+  font-weight: 900;
 }
 
 .stat-block strong {
@@ -1910,6 +1973,133 @@ input[type="text"]::placeholder {
 
 .complete-tracker .unknown span {
   background: var(--surface-2);
+}
+
+.path-tree-grouped {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 254, 250, 0.76);
+  list-style: none;
+}
+
+.path-tree-grouped > li.group {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.path-tree-grouped .group-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.path-tree-grouped .group-head span {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.path-tree-grouped .group.yes .group-head span {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.path-tree-grouped .group.no .group-head span {
+  border-color: #e0a096;
+  background: var(--red-soft);
+  color: var(--accent-dark);
+}
+
+.path-tree-grouped .group.unknown .group-head span {
+  background: var(--surface-2);
+}
+
+.path-tree-grouped .group-head strong {
+  display: block;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.path-tree-grouped .group-head small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.path-tree-grouped .group-children {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 4px 16px;
+  padding: 8px 10px 4px 12px;
+  border-left: 2px solid var(--line);
+  list-style: none;
+}
+
+.path-tree-grouped .group-children li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.path-tree-grouped .group-children li span {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 950;
+}
+
+.path-tree-grouped .group-children li.yes span {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.path-tree-grouped .group-children li.no span {
+  border-color: #e0a096;
+  background: var(--red-soft);
+  color: var(--accent-dark);
+}
+
+.path-tree-grouped .group-children li.unknown span {
+  background: var(--surface-2);
+}
+
+.path-tree-grouped .group-children strong {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.path-tree-grouped .group-children small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .profile-list {
