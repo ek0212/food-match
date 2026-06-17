@@ -574,13 +574,6 @@ button.brand-lockup:hover .brand-mark {
   text-transform: uppercase;
 }
 
-.dataset-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 30px;
-}
-
 .stat-block {
   min-width: 0;
   padding: 14px;
@@ -627,32 +620,6 @@ button.brand-lockup:hover .brand-mark {
   color: var(--green);
   font-size: 0.84rem;
   font-weight: 900;
-  overflow-wrap: anywhere;
-}
-
-.cuisine-mosaic {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 38px;
-}
-
-.cuisine-tile {
-  display: flex;
-  min-width: 0;
-  min-height: 74px;
-  align-items: center;
-  gap: 9px;
-  padding: 10px;
-  border: 1px solid rgba(32, 35, 31, 0.15);
-  border-radius: var(--radius);
-  background: rgba(255, 254, 250, 0.74);
-  font-size: 0.82rem;
-  font-weight: 850;
-}
-
-.cuisine-tile span {
-  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -1373,237 +1340,6 @@ input[type="text"]::placeholder {
   align-items: start;
 }
 
-.corpus-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.52fr);
-  gap: 18px;
-  align-items: stretch;
-  margin-bottom: 16px;
-  padding: 26px 30px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background:
-    linear-gradient(135deg, rgba(230, 238, 247, 0.88), rgba(255, 254, 250, 0.95) 52%, rgba(255, 243, 207, 0.76));
-  box-shadow: var(--shadow);
-}
-
-.corpus-hero > div:first-child {
-  display: grid;
-  align-content: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.corpus-hero h2 {
-  max-width: 13ch;
-  font-size: 3.15rem;
-  line-height: 0.98;
-  font-weight: 950;
-}
-
-.corpus-hero p {
-  max-width: 48ch;
-  color: var(--muted);
-  font-size: 1.02rem;
-}
-
-.corpus-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.corpus-visual-flow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
-.visual-flow-step {
-  display: grid;
-  width: 112px;
-  min-height: 92px;
-  place-items: center;
-  gap: 6px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(255, 254, 250, 0.78);
-}
-
-.visual-flow-step b {
-  font-size: 2rem;
-  line-height: 1;
-}
-
-.visual-flow-step small {
-  color: var(--ink);
-  font-size: 0.78rem;
-  font-weight: 950;
-  text-align: center;
-}
-
-.visual-flow-arrow {
-  color: var(--muted);
-  font-size: 1.1rem;
-  font-style: normal;
-  font-weight: 950;
-}
-
-.corpus-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.corpus-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-content: center;
-  gap: 10px;
-}
-
-.corpus-metric {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid rgba(32, 35, 31, 0.14);
-  border-radius: var(--radius);
-  background: rgba(255, 254, 250, 0.68);
-}
-
-.corpus-metric strong {
-  font-size: 1.8rem;
-  line-height: 1;
-  font-weight: 950;
-}
-
-.corpus-metric small {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 850;
-}
-
-.source-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.source-tile {
-  display: grid;
-  min-height: 118px;
-  align-content: center;
-  justify-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgba(237, 243, 232, 0.55);
-  text-align: center;
-}
-
-.source-tile b {
-  font-size: 1.55rem;
-  line-height: 1;
-}
-
-.source-tile strong {
-  font-size: 1.28rem;
-  line-height: 1;
-  font-weight: 950;
-}
-
-.source-tile span {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 850;
-}
-
-.quiz-flow-visual {
-  display: grid;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.quiz-node {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 58px;
-  padding: 12px;
-  border: 1px solid var(--ink);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: 4px 4px 0 var(--yellow-soft);
-}
-
-.quiz-node b {
-  font-size: 1.7rem;
-  line-height: 1;
-}
-
-.quiz-node strong {
-  font-size: 1rem;
-  font-weight: 950;
-}
-
-.quiz-branches,
-.quiz-outcomes,
-.choice-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.quiz-branches span,
-.quiz-outcomes span,
-.choice-strip span {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 254, 250, 0.78);
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 900;
-}
-
-.quiz-outcomes .yes,
-.choice-strip .yes {
-  border-color: rgba(25, 111, 80, 0.3);
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.quiz-outcomes .no,
-.choice-strip .no {
-  border-color: rgba(189, 53, 40, 0.24);
-  background: var(--red-soft);
-  color: var(--accent-dark);
-}
-
-.choice-strip .map-chip {
-  border-color: rgba(49, 95, 145, 0.24);
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-
-.choice-strip .choice-arrow {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-}
-
 .panel {
   padding: 20px;
 }
@@ -2271,9 +2007,7 @@ input[type="text"]::placeholder {
   .intro-layout,
   .setup-layout,
   .quiz-layout,
-  .dashboard-grid,
-  .corpus-hero,
-  .corpus-grid {
+  .dashboard-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2337,7 +2071,6 @@ input[type="text"]::placeholder {
 
   .intro-copy h2,
   .setup-copy h2,
-  .corpus-hero h2,
   .results-hero h2,
   .compare-hero h2,
   .history-panel h2,
@@ -2345,10 +2078,7 @@ input[type="text"]::placeholder {
     font-size: 2.1rem;
   }
 
-  .dataset-strip,
   .intro-facts,
-  .source-tiles,
-  .cuisine-mosaic,
   .split-evidence,
   .cuisine-evidence,
   .fringe-list,
@@ -2403,10 +2133,6 @@ input[type="text"]::placeholder {
   .setup-copy h2 {
     font-size: 1.5rem;
   }
-
-  .setup-copy .cuisine-mosaic {
-    display: none;
-  }
 }
 
 @media (max-width: 440px) {
@@ -2425,20 +2151,6 @@ input[type="text"]::placeholder {
 
   .mini-stats {
     grid-template-columns: 1fr;
-  }
-
-  .corpus-visual-flow {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .visual-flow-step {
-    width: auto;
-    min-height: 86px;
-  }
-
-  .visual-flow-arrow {
-    display: none;
   }
 
   .provenance-row {
