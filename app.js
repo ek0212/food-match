@@ -2099,11 +2099,10 @@
   }
 
   function adventureCopy(details) {
-    const asked = details.tested + details.skipped;
-    if (asked <= 0) {
+    if (details.tested <= 0) {
       return "Not enough divisive ingredient answers yet, so the score starts at 50.";
     }
-    return `You said yes to ${details.accepted} of the ${asked} most-polarizing foods we asked about.`;
+    return `You said yes to ${details.accepted} of the ${details.tested} most-polarizing foods you answered.`;
   }
 
   // ─── DAYLIST ───────────────────────────────────────────────────
@@ -3420,13 +3419,11 @@
   }
 
   function renderMapsPromptCard(id, mapsQuery) {
+    const query = mapsQuery || "restaurants near me";
     return `
-      <div class="prompt-card">
-        <pre id="${esc(id)}" class="prompt-text">${esc(mapsQuery || "")}</pre>
-        <div class="prompt-actions">
-          <button class="btn" data-action="copy-prompt" data-prompt-target="${esc(id)}">Copy</button>
-          <a class="btn" href="${esc(googleMapsSearchUrl(mapsQuery))}" target="_blank" rel="noopener">Open in Google Maps</a>
-        </div>
+      <div class="maps-card">
+        <p class="maps-query"><span id="${esc(id)}">${esc(query)}</span></p>
+        <a class="btn btn-cta" href="${esc(googleMapsSearchUrl(query))}" target="_blank" rel="noopener">Open in Google Maps &rarr;</a>
       </div>
     `;
   }
@@ -3694,6 +3691,14 @@
       return render();
     }
 
+    const ROUTE_PREFIXES = ["take=", "profile=", "compare="];
+    const isAppRoute = ROUTE_PREFIXES.some((p) => hash.startsWith(p));
+    if (!isAppRoute) {
+      // In-page anchor (e.g. section-taste). Let the browser scroll
+      // to the target instead of rerouting the app.
+      return;
+    }
+
     try {
       if (hash.startsWith("take=")) {
         state.incomingProfile = decodePayload(hash.slice(5));
@@ -3717,10 +3722,6 @@
     } catch (e) {
       showToast("Could not open that link");
     }
-
-    state.route = "quiz";
-    state.quiz = null;
-    render();
   }
 
   // ─── UTILITIES ─────────────────────────────────────────────────

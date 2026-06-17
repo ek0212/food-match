@@ -841,6 +841,32 @@ input[type="text"]::placeholder {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+.maps-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 254, 250, 0.74);
+}
+
+.maps-query {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.maps-query span {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 850;
+}
+
 .btn-quiet,
 .btn-skip {
   background: rgba(255, 254, 250, 0.74);
