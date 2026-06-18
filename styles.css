@@ -2626,6 +2626,12 @@ input[type="text"]::placeholder {
   font-size: 0.86rem;
 }
 
+.about-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
 @media (max-width: 640px) {
   .about-row {
     grid-template-columns: 1fr;

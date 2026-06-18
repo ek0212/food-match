@@ -127,7 +127,7 @@
   const CUISINES = [
     { id: "East_Asian", emoji: "\u{1F962}", label: "Soy, sesame & wok heat",
       desc: "Stir-fried noodles, fried rice, dumplings, chili oil, soy-braised meats. The flavors of Chinese and Korean kitchens." },
-    { id: "Southeast_Asian", emoji: "\u{1F35C}", label: "Fish sauce, coconut & lime",
+    { id: "Southeast_Asian", emoji: "\u{1F965}", label: "Fish sauce, coconut & lime",
       desc: "Pho, pad thai, laksa, fresh spring rolls, lemongrass curries, sambal. Bright, punchy, herbal." },
     { id: "South_Asian", emoji: "\u{1F35B}", label: "Cumin, turmeric & slow-cooked dal",
       desc: "Butter chicken, biryani, chana masala, dosa, raita. Warm spice layers built over time." },
@@ -156,7 +156,7 @@
 
   const CUISINE_EMOJI = {
     East_Asian: "\u{1F35C}",
-    Southeast_Asian: "\u{1F35C}",
+    Southeast_Asian: "\u{1F965}",
     South_Asian: "\u{1F35B}",
     Mediterranean: "\u{1FAD2}",
     Latin_American: "\u{1F32E}",
@@ -2213,7 +2213,12 @@
   function saveProfile(profile) {
     const profiles = loadProfiles().filter((p) => p.id !== profile.id);
     profiles.unshift(profile);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles.slice(0, MAX_PROFILES)));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles.slice(0, MAX_PROFILES)));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function hasSeenIntro() {
@@ -3053,6 +3058,10 @@
           <h3>Why this app uses Cooc</h3>
           <p>The quiz is about <em>cuisine and taste preferences</em>, where "what people actually cook together" is the right signal. Chem would say weird things like "you liked aged parmesan, so try natto" (both umami, no shared cuisine).</p>
           <p>This app bundles only the Cooc variant: ${ingredientsStr} ingredients, ${totalModes} modes, hand-tagged with ${cuisineCount} cuisine macro-regions from appendix C of the paper.</p>
+        </div>
+
+        <div class="about-actions">
+          <button type="button" class="btn btn-cta" data-action="home">&larr; Back to the quiz</button>
         </div>
       </section>
     `);
