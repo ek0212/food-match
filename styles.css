@@ -2221,6 +2221,39 @@ input[type="text"]::placeholder {
   color: var(--faint);
 }
 
+.reason-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.reason-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.reason-chip.hit {
+  border-color: var(--green);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.reason-chip.cuisine {
+  border-color: rgba(49, 95, 145, 0.3);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-style: italic;
+}
+
 .dish-card strong {
   font-size: 0.95rem;
 }

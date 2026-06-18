@@ -82,10 +82,10 @@
     { max: 100, label: "Wild", caption: "Loves the divisive stuff." },
   ];
   const CUISINE_BUCKETS = [
-    { min: 3, label: "Strong lean", caption: "You consistently picked this region's foods." },
-    { min: 1, label: "Mild lean", caption: "Some signal here, not your top region." },
-    { min: -1, label: "Neutral", caption: "Few cues either way." },
-    { min: -Infinity, label: "Avoid", caption: "You passed on most foods from this region." },
+    { min: 3, label: "Big yes", caption: "You kept saying yes to foods from here." },
+    { min: 1, label: "Mostly yes", caption: "More yeses than nos from this region." },
+    { min: -1, label: "Mixed", caption: "Some yes, some no. No clear pull." },
+    { min: -Infinity, label: "Mostly no", caption: "You passed on most foods from this region." },
   ];
   const COMPATIBILITY_BUCKETS = [
     { max: 25, label: "Far apart", caption: "Few shared likes, several conflicts. Compromise needed." },
@@ -560,10 +560,8 @@
   }
 
   function displayName(ingredient) {
-    return ingredient
-      .split("_")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
+    const phrase = ingredient.split("_").join(" ");
+    return phrase.charAt(0).toUpperCase() + phrase.slice(1);
   }
 
   function canonicalIngredientKey(ingredient) {
@@ -2743,7 +2741,7 @@
 
     const heroSummary = generateHeroSummary(profile);
     const answersCount = Object.keys(profile.responses || {}).length;
-    const topCuisine = cuisineEvidence[0];
+    const topCuisine = cuisineEvidence.filter((c) => c.score > 0).sort((a, b) => b.score - a.score)[0] || null;
     const topRestaurant = restaurants[0];
     const topDish = dishes[0];
     shell(`
@@ -3624,26 +3622,38 @@
   }
 
   function renderRestaurantCard(r, opts) {
-    const hasHits = r.hitKeys && r.hitKeys.length;
     const prefix = opts && opts.stylePrefix ? "Style: " : "";
+    const cuisineNames = (r.cuisines || []).map((c) => CUISINE_DISPLAY[c] || c);
+    const reasons = formatReasonChips(r.keys, r.hitKeys, cuisineNames);
     return `
       <div class="rest-card">
         <div class="rest-title"><strong>${esc(prefix + r.name)}</strong></div>
-        ${hasHits ? `<div class="match-reason">${esc(`Key matches: ${formatIngredientList(r.hitKeys, 4)}`)}</div>` : ""}
+        <div class="reason-chips">${reasons}</div>
       </div>
     `;
   }
 
   function renderDishCard(d) {
-    const reason = d.hitKeys && d.hitKeys.length
-      ? `Based on: ${formatIngredientList(d.hitKeys, 3)}`
-      : `Based on: ${CUISINE_DISPLAY[d.cuisine] || d.cuisine}`;
+    const cuisineName = CUISINE_DISPLAY[d.cuisine] || d.cuisine;
+    const reasons = formatReasonChips(d.triggers || [], d.hitKeys, [cuisineName]);
     return `
       <div class="dish-card">
         <strong>${esc(d.dish)}</strong>
-        <span class="dish-based">${esc(reason)}</span>
+        <div class="reason-chips">${reasons}</div>
       </div>
     `;
+  }
+
+  function formatReasonChips(allKeys, hitKeys, extra) {
+    const hitSet = new Set(hitKeys || []);
+    const keyChips = (allKeys || []).map((k) => {
+      const hit = hitSet.has(k);
+      return `<span class="reason-chip ${hit ? "hit" : ""}" title="${hit ? "You liked this" : "Part of this recommendation"}">${esc(displayName(k))}${hit ? " ✓" : ""}</span>`;
+    });
+    const extras = (extra || []).filter(Boolean).map((label) =>
+      `<span class="reason-chip cuisine">${esc(label)}</span>`
+    );
+    return [...keyChips, ...extras].join("");
   }
 
   function renderFringeRecipeCard(recipe) {
