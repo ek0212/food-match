@@ -1497,24 +1497,8 @@ input[type="text"]::placeholder {
 .path-tree__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  align-items: flex-start;
-}
-
-.tree-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-start;
-}
-
-.tree-branch-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-left: 10px;
-  border-left: 2px solid var(--line);
-  margin-left: 8px;
+  gap: 5px;
+  align-items: center;
 }
 
 .tree-chip {
@@ -1574,8 +1558,21 @@ input[type="text"]::placeholder {
   box-shadow: 0 0 0 3px rgba(49, 95, 145, 0.18);
 }
 
+.tree-chip.branch {
+  padding: 2px 5px;
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+.tree-chip.branch::before {
+  content: "↳";
+  margin-right: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .tree-chip.branch .tree-chip__emoji {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .tree-chip.parent-context {

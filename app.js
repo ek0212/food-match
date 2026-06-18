@@ -3239,12 +3239,13 @@
       `;
     }
 
-    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 20);
+    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 24);
     const activeCard = currentCard(quiz);
     const activeId = activeCard ? activeCard.id : null;
-    const groups = groupTreeNodes(visible, activeId);
 
-    const chips = groups.map((group) => renderTreeChipGroup(group, quiz, activeId, activeParentId)).join("");
+    const chips = visible
+      .map((card) => renderTreeChip(card, quiz, activeId, activeParentId))
+      .join("");
 
     const tail = hiddenCount > 0
       ? `<p class="path-tree__hidden">+${hiddenCount} earlier</p>`
@@ -3269,20 +3270,6 @@
       return ingredientEmoji(card.label || "");
     }
     return "\u{1F37D}️";
-  }
-
-  function renderTreeChipGroup(group, quiz, activeId, activeParentId) {
-    const parentChip = renderTreeChip(group.parent, quiz, activeId, activeParentId);
-    if (!group.children.length) return parentChip;
-    const childChips = group.children
-      .map((c) => renderTreeChip(c, quiz, activeId, activeParentId))
-      .join("");
-    return `
-      <div class="tree-group">
-        ${parentChip}
-        <div class="tree-branch-chips">${childChips}</div>
-      </div>
-    `;
   }
 
   function renderTreeChip(card, quiz, activeId, activeParentId) {
@@ -3312,56 +3299,6 @@
     ];
     const current = phases.find((p) => p.key === quiz.phase) || phases[0];
     return current;
-  }
-
-  function groupTreeNodes(visible, activeId) {
-    const groups = [];
-    const byParent = new Map();
-    visible.forEach((card) => {
-      if (card.type === "ingredient-probe" && card.parentId) {
-        const arr = byParent.get(card.parentId) || [];
-        arr.push(card);
-        byParent.set(card.parentId, arr);
-      }
-    });
-    visible.forEach((card) => {
-      if (card.type === "ingredient-probe" && card.parentId) {
-        const parentInVisible = visible.some((c) => c.id === card.parentId);
-        if (parentInVisible) return;
-      }
-      groups.push({ parent: card, children: byParent.get(card.id) || [] });
-    });
-    return groups;
-  }
-
-  function renderTreeGroup(group, quiz, activeId, activeParentId) {
-    const parentHtml = renderTreeNode(group.parent, quiz, activeId, activeParentId);
-    if (!group.children.length) return parentHtml;
-    const childrenHtml = group.children
-      .map((c) => renderTreeNode(c, quiz, activeId, activeParentId))
-      .join("");
-    return `${parentHtml.replace(/<\/li>\s*$/, `<ol class="tree-branch">${childrenHtml}</ol></li>`)}`;
-  }
-
-  function renderTreeNode(card, quiz, activeId, activeParentId) {
-    const value = quiz.responses[card.id];
-    const isActive = card.id === activeId;
-    const nodeState = treeState(value, isActive);
-    const classes = [
-      "tree-node",
-      nodeState.key,
-      card.type === "ingredient-probe" ? "branch" : "",
-      card.id === activeParentId ? "parent-context" : "",
-    ].filter(Boolean).join(" ");
-    return `
-      <li class="${classes}">
-        <span class="tree-marker">${esc(nodeState.short)}</span>
-        <div class="tree-copy">
-          <strong>${esc(card.label)}</strong>
-          <small>${esc(treeNodeDetail(card, value, isActive))}</small>
-        </div>
-      </li>
-    `;
   }
 
   function treeVisibleCards(quiz, limit) {
