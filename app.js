@@ -2324,17 +2324,57 @@
               <span class="intro-dot ${i === step ? "active" : ""}"></span>
             `).join("")}
           </div>
-          ${introMain(step)}
+          ${introContent(step)}
           <div class="intro-actions">
             <button class="btn btn-cta" data-action="intro-next">${step === INTRO_STEP_COUNT - 1 ? "Start quiz" : "Next"}</button>
             <button class="btn btn-quiet" data-action="intro-skip">Skip intro</button>
           </div>
         </div>
-        <aside class="intro-side">
-          ${introSide(step)}
-        </aside>
       </section>
     `);
+  }
+
+  function introContent(step) {
+    return introMain(step).replace(/<\/div>\s*$/, introSteps(step) + "</div>");
+  }
+
+  function introSteps(step) {
+    if (step === 1) {
+      return `
+        <div class="intro-steps">
+          ${flowStep("1", "Yes")}
+          ${flowStep("0", "No")}
+          ${flowStep("_", "Unsure")}
+        </div>
+      `;
+    }
+    if (step === 2) {
+      return `
+        <div class="intro-steps">
+          <div class="flow-step"><b>1</b><span>Cuisines first: pick <span class="intro-red">recipe families</span>.</span></div>
+          <div class="flow-step"><b>2</b><span>Yes pulls in a neighborhood; no fences it off.</span></div>
+          <div class="flow-step"><b>3</b><span><span class="intro-red">Edge ingredients</span> separate dislikes from generalizations.</span></div>
+        </div>
+      `;
+    }
+    if (step === 3) {
+      return `
+        <div class="intro-steps">
+          ${flowStep("\u{2764}", "Loves")}
+          ${flowStep("\u{2715}", "Hard passes")}
+          ${flowStep("?", "Worth trying")}
+          ${flowStep("\u{1F37D}", "Restaurant ideas")}
+          ${flowStep("\u{1F465}", "Friend compatibility")}
+        </div>
+      `;
+    }
+    return `
+      <div class="intro-steps">
+        ${flowStep("1", "Answer ~20 foods.")}
+        ${flowStep("2", "See your taste map.")}
+        ${flowStep("3", "Send to a friend.")}
+      </div>
+    `;
   }
 
   function introMain(step) {
@@ -2343,7 +2383,7 @@
         <div class="intro-copy">
           <div class="eyebrow">How to play</div>
           <h2>Yes, No, or Unsure.</h2>
-          <p>Tap, or press <kbd>1</kbd> / <kbd>0</kbd> / <kbd>Space</kbd>.</p>
+          <p>Tap a button or press a key.</p>
         </div>
       `;
     }
@@ -2354,7 +2394,6 @@
           <div class="eyebrow">How it works</div>
           <h2>Built on a recipe map.</h2>
           <p>Foods that cook together sit close on a <span class="intro-red">map of ingredients</span>. Soy, sesame and wok in one corner. Olive oil, basil and lemon in another. Cardamom, ghee and cumin somewhere else.</p>
-          <p>Your yes/no answers steer through this map. We learn the corners you live in and the ones you avoid.</p>
           <p class="intro-footnote">Map from <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener"><span class="intro-red">Epicure</span></a> (${EPICURE_PAPER_DATE}): 4.14M recipes &rarr; 1,790 ingredients &rarr; 150 neighborhoods.</p>
         </div>
       `;
@@ -2365,7 +2404,6 @@
         <div class="intro-copy">
           <div class="eyebrow">What you get</div>
           <h2>Your taste, mapped.</h2>
-          <p>Loves, passes, things to try, restaurants to share, friend compatibility.</p>
         </div>
       `;
     }
@@ -2374,49 +2412,6 @@
       <div class="intro-copy">
         <div class="eyebrow">Why</div>
         <h2>Find foods you both want to eat.</h2>
-        <p>Quick yes/no quiz. Share with a friend, compare tastes.</p>
-      </div>
-    `;
-  }
-
-  function introSide(step) {
-    if (step === 1) {
-      return `
-        <div class="flow-stack">
-          ${flowStep("1", "Yes")}
-          ${flowStep("0", "No")}
-          ${flowStep("_", "Unsure")}
-        </div>
-      `;
-    }
-
-    if (step === 2) {
-      return `
-        <div class="flow-stack">
-          <div class="flow-step"><b>1</b><span>Cuisines first: pick <span class="intro-red">recipe families</span>.</span></div>
-          <div class="flow-step"><b>2</b><span>Yes pulls in a neighborhood; no fences it off.</span></div>
-          <div class="flow-step"><b>3</b><span><span class="intro-red">Edge ingredients</span> separate dislikes from generalizations.</span></div>
-        </div>
-      `;
-    }
-
-    if (step === 3) {
-      return `
-        <div class="flow-stack">
-          ${flowStep("\u{2764}", "Loves")}
-          ${flowStep("\u{2715}", "Hard passes")}
-          ${flowStep("?", "Worth trying")}
-          ${flowStep("\u{1F37D}", "Restaurant ideas")}
-          ${flowStep("\u{1F465}", "Friend compatibility")}
-        </div>
-      `;
-    }
-
-    return `
-      <div class="flow-stack">
-        ${flowStep("1", "Answer ~20 foods.")}
-        ${flowStep("2", "See your taste map.")}
-        ${flowStep("3", "Send to a friend.")}
       </div>
     `;
   }
