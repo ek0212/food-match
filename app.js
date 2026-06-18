@@ -87,6 +87,12 @@
     { min: -1, label: "Neutral", caption: "Few cues either way." },
     { min: -Infinity, label: "Avoid", caption: "You passed on most foods from this region." },
   ];
+  const COMPATIBILITY_BUCKETS = [
+    { max: 25, label: "Far apart", caption: "Few shared likes, several conflicts. Compromise needed." },
+    { max: 55, label: "Workable", caption: "Some shared ground, watch for conflicts." },
+    { max: 80, label: "Aligned", caption: "Plenty of overlap, easy to plan a meal together." },
+    { max: 100, label: "Twins", caption: "Almost the same palate." },
+  ];
   const TASTE_QUIET_THRESHOLD = 3;
   const QUIZ_TARGET = 35;
   const MAPS_RESTRICTION_KEYWORDS = {
@@ -133,8 +139,8 @@
       desc: "Steak frites, mac and cheese, roast chicken, charcuterie boards, sourdough. Rich, familiar, hearty." },
     { id: "Japanese", emoji: "\u{1F363}", label: "Dashi, raw fish & pickles",
       desc: "Sushi, ramen, miso soup, tempura, tsukemono, natto. Clean umami and precise textures." },
-    { id: "Eastern_European", emoji: "\u{1F963}", label: "Rye, dill & sour cream",
-      desc: "Pierogi, borscht, kasha, sauerkraut, paprikash, smoked sausage. Hearty, fermented, warming." },
+    { id: "Eastern_European", emoji: "\u{1F95F}", label: "Pierogi, rye & sour cream",
+      desc: "Borscht, kasha, sauerkraut, paprikash, smoked sausage, dill. Hearty, fermented, warming." },
   ];
 
   const CUISINE_DISPLAY = {
@@ -156,7 +162,7 @@
     Latin_American: "\u{1F32E}",
     Western_Atlantic: "\u{1F354}",
     Japanese: "\u{1F363}",
-    Eastern_European: "\u{1F963}",
+    Eastern_European: "\u{1F95F}",
   };
 
   const CUISINE_KEYWORDS = {
@@ -1339,6 +1345,10 @@
     return CUISINE_BUCKETS.find((b) => score >= b.min) || CUISINE_BUCKETS[CUISINE_BUCKETS.length - 1];
   }
 
+  function compatibilityBucket(score) {
+    return COMPATIBILITY_BUCKETS.find((b) => score <= b.max) || COMPATIBILITY_BUCKETS[COMPATIBILITY_BUCKETS.length - 1];
+  }
+
   function tasteSummary(taste) {
     const entries = Object.entries(taste)
       .map(([key, value]) => ({ key, value, label: TASTE_DIMENSION_LABELS[key] || key }))
@@ -1612,8 +1622,9 @@
       const hits = d.triggers.filter((t) => recommendationKeyMatches(liked, t));
       const misses = d.triggers.filter((t) => recommendationKeyMatches(disliked, t));
       if (misses.length > 0 || hits.length === 0) return null;
-      let score = hits.length * 3;
-      score += Math.max(0, affinities[d.cuisine] || 0);
+      const cuisineAffinity = Math.max(0, affinities[d.cuisine] || 0);
+      if (hits.length < 2 && cuisineAffinity < 2) return null;
+      let score = hits.length * 3 + cuisineAffinity;
       return { ...d, score, hitKeys: hits };
     })
     .filter(Boolean)
@@ -1712,7 +1723,11 @@
   // ─── RESTAURANT SEARCH PROMPTS ─────────────────────────────────
 
   function buildPersonalRestaurantPrompt(profile) {
-    const name = profile.name || "me";
+    const rawName = (profile.name || "").trim();
+    const useName = rawName && !/^debug$|^fixture/i.test(rawName);
+    const opener = useName
+      ? `I am looking for restaurants near me for ${rawName}.`
+      : "I am looking for restaurants near me.";
     const liked = promptResponseLabels(profile, (id, v) => typeof v === "number" && v > 0, 12);
     const disliked = promptResponseLabels(profile, (id, v) => typeof v === "number" && v < 0, 8);
     const cuisines = promptCuisineLabels(profile, 5);
@@ -1725,7 +1740,7 @@
     const mapsQuery = personalMapsQuery(profile, cuisines, dishes);
 
     const text = [
-      `I am looking for restaurants near me for ${name}. Use my current location in Google Maps or Ask Maps, then suggest specific places and explain why each one fits.`,
+      `${opener} Use my current location in Google Maps or Ask Maps, then suggest specific places and explain why each one fits.`,
       "",
       "My strongest food signals:",
       `- Cuisines or regions I seem pulled toward: ${formatPromptList(cuisines, "No clear region yet")}.`,
@@ -2886,9 +2901,9 @@
           <p>${sharedSignalCount} shared signals, ${result.conflicts.length} watch-outs, ${result.bridges.length} possible introductions.</p>
         </div>
         <div class="score-dial">
-          <span>${result.score}</span>
-          <small>compatibility score</small>
-          <em>0-100 from shared likes, directions, dishes, and conflicts</em>
+          <span class="score-dial-label">${esc(compatibilityBucket(result.score).label)}</span>
+          <small>compatibility</small>
+          <em>${esc(compatibilityBucket(result.score).caption)}</em>
         </div>
       </section>
 

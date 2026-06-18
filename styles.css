@@ -1630,6 +1630,13 @@ input[type="text"]::placeholder {
   font-weight: 950;
 }
 
+.score-dial span.score-dial-label {
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+
 .score-dial small {
   display: block;
   width: 100%;
