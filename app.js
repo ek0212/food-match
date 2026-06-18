@@ -2267,6 +2267,7 @@
     if (state.route === "profile") return renderResults();
     if (state.route === "compare") return renderCompare();
     if (state.route === "history") return renderHistory();
+    if (state.route === "about") return renderAbout();
     if (shouldShowOnboarding()) return renderOnboarding();
     if (!state.quiz) return renderSetup();
     if (state.quiz.phase === "done") return finishQuiz();
@@ -2296,7 +2297,7 @@
         </header>
         ${content}
         <footer class="footer">
-          Built on an <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">open research dataset</a> of ingredient pairings in real recipes.
+          Built on an <button type="button" class="footer-link" data-action="about">open research dataset</button> of ingredient pairings in real recipes.
         </footer>
         ${state.toast ? `<div class="toast">${esc(state.toast)}</div>` : ""}
       </div>
@@ -2995,6 +2996,73 @@
     bindCompareEvents();
   }
 
+  function renderAbout() {
+    const totalModes = (epicure && Array.isArray(epicure.modes)) ? epicure.modes.length : 150;
+    const totalIngredients = (epicure && Array.isArray(epicure.ingredients)) ? epicure.ingredients.length : 1790;
+    const cuisineCount = (epicure && epicure.cuisineProvenance) ? Object.keys(epicure.cuisineProvenance).length : 8;
+    const ingredientsStr = totalIngredients.toLocaleString();
+    shell(`
+      <section class="about-panel">
+        <div class="about-hero">
+          <div class="eyebrow">About the data</div>
+          <h2>What's this built on?</h2>
+        </div>
+
+        <div class="about-block">
+          <h3>Epicure, in plain English</h3>
+          <p>Epicure is a research paper (<a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">arxiv ${EPICURE_PAPER_URL.split("/").pop()}</a>, ${EPICURE_PAPER_DATE}) that builds <strong>300-dimensional embeddings of cooking ingredients</strong>. Think word2vec, but for food.</p>
+          <p>Each of ${ingredientsStr} ingredients gets mapped to a point in 300-D space where similar ingredients cluster &mdash; <em>cumin</em> sits near <em>coriander</em>, <em>soy sauce</em> near <em>oyster sauce</em>. Trained on a corpus of <strong>4.14M recipes across 9 languages</strong>.</p>
+          <p>Clustering those embeddings (with a Gaussian mixture model) produces <strong>modes</strong> &mdash; ${totalModes} ingredient neighborhoods like <em>"Mediterranean savory herbs and cheeses"</em> or <em>"East Asian umami mushrooms"</em>. The quiz is essentially a tour through that neighborhood map.</p>
+        </div>
+
+        <div class="about-block">
+          <h3>Why three datasets?</h3>
+          <p>The Epicure paper ships three competing answers to <em>"what makes two ingredients similar?"</em>:</p>
+          <div class="about-table">
+            <div class="about-row about-row-head">
+              <div>Variant</div><div>Signal source</div><div>Captures</div>
+            </div>
+            <div class="about-row">
+              <div><strong>Cooc</strong> <span class="about-tag">used here</span></div>
+              <div>"These two ingredients show up in the same recipe a lot."</div>
+              <div>Cultural / culinary tradition &mdash; what cooks pair together.</div>
+            </div>
+            <div class="about-row">
+              <div><strong>Core</strong></div>
+              <div>Ingredient &rarr; chemical-compound graph, 1:1 entity-unique edges.</div>
+              <div>Compound-mediated similarity, balanced.</div>
+            </div>
+            <div class="about-row">
+              <div><strong>Chem</strong></div>
+              <div>FlavorDB chemistry graph, permissive 1:many compound matching.</div>
+              <div>Pure chemical-flavor overlap.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="about-block">
+          <h3>What's the difference, concretely?</h3>
+          <ul class="about-list">
+            <li><strong>Cooc</strong> says <em>soy sauce &asymp; ginger</em> because they co-appear in stir-fries.</li>
+            <li><strong>Chem</strong> says <em>soy sauce &asymp; aged parmesan</em> because both are heavy in glutamate / umami compounds &mdash; even though no one cooks them together.</li>
+            <li><strong>Core</strong> is the middle ground.</li>
+          </ul>
+        </div>
+
+        <div class="about-block">
+          <h3>Why this app uses Cooc</h3>
+          <p>The quiz is about <em>cuisine and taste preferences</em>, where "what people actually cook together" is the right signal. Chem would say weird things like "you liked aged parmesan, so try natto" (both umami, no shared cuisine).</p>
+          <p>This app bundles only the Cooc variant: ${ingredientsStr} ingredients, ${totalModes} modes, hand-tagged with ${cuisineCount} cuisine macro-regions from appendix C of the paper.</p>
+        </div>
+
+        <div class="about-block">
+          <h3>Source files</h3>
+          <p>Everything ships as a single static JSON bundle under <code>data/epicure.json</code>. Original CSVs are linked from the <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">arxiv paper</a> under "ancillary files".</p>
+        </div>
+      </section>
+    `);
+  }
+
   function renderHistory() {
     const profiles = loadProfiles();
     shell(`
@@ -3589,6 +3657,10 @@
       }
       if (action === "history") {
         state.route = "history";
+        render();
+      }
+      if (action === "about") {
+        state.route = "about";
         render();
       }
       if (action === "nav-back") {
