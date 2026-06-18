@@ -208,6 +208,12 @@ button.brand-lockup:hover .brand-mark {
   font-size: 1.02rem;
 }
 
+.intro-copy p.intro-footnote {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
 .intro-progress,
 .intro-actions {
   display: flex;

@@ -2347,7 +2347,9 @@
         <div class="intro-copy">
           <div class="eyebrow">How it works</div>
           <h2>Built on a recipe map.</h2>
-          <p>From <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener"><span class="intro-red">Epicure</span></a> (${EPICURE_PAPER_DATE}): 4.14M recipes &rarr; 1,790 ingredients in 150 neighborhoods.</p>
+          <p>Foods that cook together sit close on a <span class="intro-red">map of ingredients</span>. Soy, sesame and wok in one corner. Olive oil, basil and lemon in another. Cardamom, ghee and cumin somewhere else.</p>
+          <p>Your yes/no answers steer through this map. We learn the corners you live in and the ones you avoid.</p>
+          <p class="intro-footnote">Map from <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener"><span class="intro-red">Epicure</span></a> (${EPICURE_PAPER_DATE}): 4.14M recipes &rarr; 1,790 ingredients &rarr; 150 neighborhoods.</p>
         </div>
       `;
     }
