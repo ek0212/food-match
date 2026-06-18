@@ -3210,54 +3210,107 @@
   }
 
   function renderQuizTree(quiz) {
-    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 9);
-    const nodes = [];
-    const answered = Object.keys(quiz.responses || {}).length;
+    const answered = Object.values(quiz.responses || {}).filter((v) => v !== undefined).length;
+    const phase = phaseProgress(quiz);
+    const pct = Math.min(100, Math.round((answered / QUIZ_TARGET) * 100));
 
-    nodes.push(`
-      <li class="tree-node root">
-        <span class="tree-marker"></span>
-        <div class="tree-copy">
-          <strong>Decision tree</strong>
-          <small>${answered} of ${QUIZ_TARGET} answers mapped</small>
-        </div>
-      </li>
-    `);
+    const header = `
+      <header class="path-tree__head">
+        <span class="phase-pill" data-phase="${esc(phase.key)}">${esc(phase.label)}</span>
+        <span class="path-tree__count">${answered} / ${QUIZ_TARGET}</span>
+      </header>
+      <div class="path-tree__bar" role="progressbar" aria-valuenow="${answered}" aria-valuemax="${QUIZ_TARGET}">
+        <span style="width:${pct}%"></span>
+      </div>
+    `;
 
-    if (hiddenCount > 0) {
-      nodes.push(`
-        <li class="tree-node collapsed">
-          <span class="tree-marker"></span>
-          <div class="tree-copy">
-            <strong>${hiddenCount} earlier decisions</strong>
-            <small>Kept out of this compact view</small>
-          </div>
-        </li>
-      `);
+    if (answered === 0) {
+      return `
+        <section class="path-tree" aria-label="Decision path">
+          ${header}
+          <p class="path-tree__empty">Your answers branch out here as you go.</p>
+        </section>
+      `;
     }
 
-    visible.forEach((card, offset) => {
-      const isActive = card === currentCard(quiz);
-      const value = quiz.responses[card.id];
-      const nodeState = treeState(value, isActive);
-      const classes = [
-        "tree-node",
-        nodeState.key,
-        card.type === "ingredient-probe" ? "branch" : "",
-        card.id === activeParentId ? "parent-context" : "",
-      ].filter(Boolean).join(" ");
-      nodes.push(`
-        <li class="${classes}">
-          <span class="tree-marker">${esc(nodeState.short)}</span>
-          <div class="tree-copy">
-            <strong>${esc(card.label)}</strong>
-            <small>${esc(treeNodeDetail(card, value, isActive))}</small>
-          </div>
-        </li>
-      `);
-    });
+    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 9);
+    const activeCard = currentCard(quiz);
+    const activeId = activeCard ? activeCard.id : null;
+    const groups = groupTreeNodes(visible, activeId);
 
-    return `<ol class="path-tree" aria-label="Taste decision tree">${nodes.join("")}</ol>`;
+    const spine = groups.map((group) => renderTreeGroup(group, quiz, activeId, activeParentId)).join("");
+
+    const tail = hiddenCount > 0
+      ? `<p class="path-tree__hidden">+${hiddenCount} earlier ${hiddenCount === 1 ? "decision" : "decisions"} not shown</p>`
+      : "";
+
+    return `
+      <section class="path-tree" aria-label="Decision path">
+        ${header}
+        <ol class="path-tree__spine">${spine}</ol>
+        ${tail}
+      </section>
+    `;
+  }
+
+  function phaseProgress(quiz) {
+    const phases = [
+      { key: "cuisines", label: "Phase 1 of 3 · Cuisines" },
+      { key: "modes", label: "Phase 2 of 3 · Recipe patterns" },
+      { key: "ingredients", label: "Phase 3 of 3 · Ingredients" },
+    ];
+    const current = phases.find((p) => p.key === quiz.phase) || phases[0];
+    return current;
+  }
+
+  function groupTreeNodes(visible, activeId) {
+    const groups = [];
+    const byParent = new Map();
+    visible.forEach((card) => {
+      if (card.type === "ingredient-probe" && card.parentId) {
+        const arr = byParent.get(card.parentId) || [];
+        arr.push(card);
+        byParent.set(card.parentId, arr);
+      }
+    });
+    visible.forEach((card) => {
+      if (card.type === "ingredient-probe" && card.parentId) {
+        const parentInVisible = visible.some((c) => c.id === card.parentId);
+        if (parentInVisible) return;
+      }
+      groups.push({ parent: card, children: byParent.get(card.id) || [] });
+    });
+    return groups;
+  }
+
+  function renderTreeGroup(group, quiz, activeId, activeParentId) {
+    const parentHtml = renderTreeNode(group.parent, quiz, activeId, activeParentId);
+    if (!group.children.length) return parentHtml;
+    const childrenHtml = group.children
+      .map((c) => renderTreeNode(c, quiz, activeId, activeParentId))
+      .join("");
+    return `${parentHtml.replace(/<\/li>\s*$/, `<ol class="tree-branch">${childrenHtml}</ol></li>`)}`;
+  }
+
+  function renderTreeNode(card, quiz, activeId, activeParentId) {
+    const value = quiz.responses[card.id];
+    const isActive = card.id === activeId;
+    const nodeState = treeState(value, isActive);
+    const classes = [
+      "tree-node",
+      nodeState.key,
+      card.type === "ingredient-probe" ? "branch" : "",
+      card.id === activeParentId ? "parent-context" : "",
+    ].filter(Boolean).join(" ");
+    return `
+      <li class="${classes}">
+        <span class="tree-marker">${esc(nodeState.short)}</span>
+        <div class="tree-copy">
+          <strong>${esc(card.label)}</strong>
+          <small>${esc(treeNodeDetail(card, value, isActive))}</small>
+        </div>
+      </li>
+    `;
   }
 
   function treeVisibleCards(quiz, limit) {

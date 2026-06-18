@@ -1419,14 +1419,97 @@ input[type="text"]::placeholder {
 
 .path-tree {
   display: grid;
-  gap: 0;
+  gap: 10px;
   margin-top: 10px;
-  overflow: visible;
-  padding: 10px 10px 10px 12px;
+  padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: rgba(255, 254, 250, 0.84);
+}
+
+.path-tree__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.phase-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.phase-pill[data-phase="modes"] {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.phase-pill[data-phase="ingredients"] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.path-tree__count {
+  font-size: 0.74rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.path-tree__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.path-tree__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  transition: width 0.25s ease-out;
+}
+
+.path-tree__empty {
+  margin: 0;
+  padding: 14px 6px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.path-tree__hidden {
+  margin: 0;
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.path-tree__spine {
+  position: relative;
   list-style: none;
+  margin: 0;
+  padding: 4px 0 4px 18px;
+}
+
+.path-tree__spine::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: var(--line);
+  border-radius: 1px;
 }
 
 .tree-node {
@@ -1435,46 +1518,52 @@ input[type="text"]::placeholder {
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
-  padding: 7px 0;
+  padding: 6px 0;
 }
 
-.tree-node::before {
+.path-tree__spine > .tree-node::before {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 16px;
-  width: 1px;
+  left: -11px;
+  top: 18px;
+  width: 9px;
+  height: 2px;
+  background: var(--line);
+  border-radius: 1px;
+}
+
+.tree-branch {
+  position: relative;
+  list-style: none;
+  margin: 2px 0 4px 18px;
+  padding: 0 0 0 14px;
+}
+
+.tree-branch::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -2px;
+  bottom: 10px;
+  width: 2px;
   background: var(--line);
 }
 
-.tree-node:first-child::before {
-  top: 50%;
-}
-
-.tree-node:last-child::before {
-  bottom: 50%;
-}
-
-.tree-node.branch {
-  margin-left: 18px;
-  grid-template-columns: 34px minmax(0, 1fr);
-}
-
-.tree-node.branch::after {
+.tree-branch > .tree-node::before {
   content: "";
   position: absolute;
-  top: 50%;
-  left: -18px;
-  width: 34px;
-  height: 1px;
+  left: -14px;
+  top: 18px;
+  width: 12px;
+  height: 2px;
   background: var(--line);
 }
 
-.tree-node.parent-context .tree-marker {
-  border-color: rgba(49, 95, 145, 0.3);
-  background: var(--blue-soft);
-  color: var(--blue);
+.tree-node.parent-context {
+  background: rgba(230, 238, 247, 0.6);
+  border-radius: 6px;
+  padding: 6px 6px;
+  margin-left: -4px;
 }
 
 .tree-marker {
