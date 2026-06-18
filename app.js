@@ -2156,9 +2156,13 @@
 
   function adventureCopy(details) {
     if (details.tested <= 0) {
-      return "Not enough divisive ingredient answers yet, so the score starts at 50.";
+      return "You haven't tried enough divisive foods yet to call it.";
     }
-    return `You said yes to ${details.accepted} of the ${details.tested} most-polarizing foods you answered.`;
+    const ratio = details.accepted / details.tested;
+    if (ratio >= 0.75) return "You said yes to most of the divisive foods we asked about.";
+    if (ratio >= 0.45) return "You said yes to about half of the divisive foods we asked about.";
+    if (ratio >= 0.2) return "You said yes to a few of the divisive foods we asked about.";
+    return "You passed on most of the divisive foods we asked about.";
   }
 
   // ─── DAYLIST ───────────────────────────────────────────────────
@@ -2735,8 +2739,12 @@
     const fringeRecipes = suggestFringeRecipes(profile);
     const restaurantPrompt = buildPersonalRestaurantPrompt(profile);
     const taste = tasteSignature(profile);
-    const liked = topResponses(profile, (id, v) => typeof v === "number" && v > 0).slice(0, 10);
-    const disliked = topResponses(profile, (id, v) => typeof v === "number" && v < 0).slice(0, 6);
+    const allLiked = topResponses(profile, (id, v) => typeof v === "number" && v > 0);
+    const allDisliked = topResponses(profile, (id, v) => typeof v === "number" && v < 0);
+    const liked = allLiked.slice(0, 10);
+    const disliked = allDisliked.slice(0, 6);
+    const likedCount = allLiked.length;
+    const dislikedCount = allDisliked.length;
     const namePossessive = profile.name ? esc(profile.name) + "'s" : "Your";
 
     const heroSummary = generateHeroSummary(profile);
@@ -2768,11 +2776,11 @@
               <small>answers mapped</small>
             </div>
             <div class="hero-stat">
-              <strong>${liked.length}</strong>
+              <strong>${likedCount}</strong>
               <small>strong likes</small>
             </div>
             <div class="hero-stat">
-              <strong>${disliked.length}</strong>
+              <strong>${dislikedCount}</strong>
               <small>hard passes</small>
             </div>
           </div>
@@ -2800,7 +2808,7 @@
           <div class="panel-heading">
             <div>
               <div class="section-label">Cuisine compass</div>
-              <h3>Regional evidence ${hintBlock("This combines direct region answers with later recipe-cluster and ingredient-neighborhood evidence.")}</h3>
+              <h3>Regional evidence</h3>
             </div>
           </div>
           ${renderCuisineEvidence(cuisineEvidence)}
@@ -2808,13 +2816,13 @@
 
         <div class="panel panel-soft">
           <div class="section-label">Taste spectrum</div>
-          <h3>Top flavors ${hintBlock("This compresses many answers into the flavors most likely to matter.")}</h3>
+          <h3>Top flavors</h3>
           ${renderTasteBars(taste)}
         </div>
 
         <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Evidence</div>
-          <h3>What shaped your result ${hintBlock("These answers did the most work in shaping the suggestions.")}</h3>
+          <h3>What shaped your result</h3>
           <div class="split-evidence">
             <div>
               <div class="subhead">Likes</div>
@@ -2834,7 +2842,7 @@
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="section-label">Where to eat</div>
-          <h3>Restaurant fit ${hintBlock("These places match the ingredients and regions you kept saying yes to.")}</h3>
+          <h3>Restaurant fit</h3>
           <p class="panel-hint">(category, not a specific spot)</p>
           <div class="recommendation-list">
             ${restaurants.length ? restaurants.slice(0, 5).map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
@@ -2843,7 +2851,7 @@
 
         <div class="panel panel-soft">
           <div class="section-label">What to order</div>
-          <h3>Dish ideas ${hintBlock("Dishes appear when your yes answers cover their key ingredients.")}</h3>
+          <h3>Dish ideas</h3>
           <div class="dish-stack">
             ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
           </div>
@@ -2851,7 +2859,7 @@
 
         <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Fringe recipes</div>
-          <h3>Try something new ${hintBlock("These push the boundary without using ingredients you already rejected.")}</h3>
+          <h3>Try something new</h3>
           <div class="fringe-list">
             ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
           </div>
@@ -3657,6 +3665,8 @@
   }
 
   function renderFringeRecipeCard(recipe) {
+    const cuisineName = CUISINE_DISPLAY[recipe.cuisine] || recipe.cuisine;
+    const reasons = formatReasonChips(recipe.keys || [], recipe.hitKeys || [], [cuisineName]);
     return `
       <div class="fringe-card">
         <div class="fringe-card-top">
@@ -3664,7 +3674,7 @@
           <span>Stretch ${recipe.fringe}/10</span>
         </div>
         <p>${esc(recipe.note)}</p>
-        <small>${esc(recipe.reason)}</small>
+        <div class="reason-chips">${reasons}</div>
       </div>
     `;
   }
