@@ -1,8 +1,10 @@
 # Food Match — Architecture
 
-Single-page vanilla-JS app. No build step, no framework, no tests.
-All UI logic lives in one IIFE inside `app.js`. Data is a static
-JSON file shipped under `data/`.
+Single-page vanilla-JS app. No build step, no framework, no runtime
+dependencies. All UI logic lives in one IIFE inside `app.js`. Pure
+restriction helpers are factored into `restrictions.js` and covered
+by `node:test` unit tests under `test/`. Data is a static JSON file
+shipped under `data/`.
 
 This doc is the first thing a coding agent (or new contributor)
 should read before touching the code. Line numbers point at the
@@ -13,10 +15,12 @@ not contracts.
 
 | File | What's in it |
 |---|---|
-| `index.html` | Page shell. Mounts `#app`, loads `styles.css` and `app.js`. ~16 lines. |
-| `app.js` | Everything: constants, state, data load, quiz engine, scoring, sharing, rendering, debug toolkit. One IIFE. ~3700 lines. |
-| `styles.css` | All styles. ~1200 lines. |
+| `index.html` | Page shell. Mounts `#app`, loads `styles.css`, `restrictions.js`, and `app.js`. |
+| `app.js` | Everything: constants, state, data load, quiz engine, scoring, sharing, rendering, debug toolkit. One IIFE. |
+| `restrictions.js` | Pure dietary-restriction helpers. Shared with the Node test runner. |
+| `styles.css` | All styles. |
 | `data/epicure.json` | Static dataset of ingredients, modes, cuisine provenance. Loaded once at boot. |
+| `test/restrictions.test.js` | `node --test` unit tests for `restrictions.js`. |
 
 ## Screen flow
 

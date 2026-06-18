@@ -25,7 +25,7 @@ VS Code extension.
 | File | Role |
 |---|---|
 | `index.html` | Page shell. Loads styles and `app.js`. |
-| `app.js` | All logic. One IIFE, ~3700 lines. Start here. |
+| `app.js` | All logic. One IIFE. Start here. |
 | `styles.css` | All styles. |
 | `data/epicure.json` | Static dataset, loaded once at boot. |
 | `ARCHITECTURE.md` | Read this before editing `app.js`. |
@@ -58,9 +58,10 @@ Full spec: `ARCHITECTURE.md` → Debug toolkit.
 
 ## Known weirdness
 
-- `app.js` is one ~3700-line file by design. Read `ARCHITECTURE.md`
+- `app.js` is one large file by design. Read `ARCHITECTURE.md`
   first to navigate it.
 - `data/epicure.json` is large and loaded eagerly at boot.
-- No automated tests. Use the debug fixtures to repro states.
+- Unit tests cover `restrictions.js` (`npm test`). UI / quiz-engine
+  states are still best reproduced with the debug fixtures.
 - Saved profiles live in `localStorage["food-match-v3"]`,
   cap of 12. Clearing site data resets them.
