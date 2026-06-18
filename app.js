@@ -94,7 +94,7 @@
     { max: 100, label: "Twins", caption: "Almost the same palate." },
   ];
   const TASTE_QUIET_THRESHOLD = 3;
-  const QUIZ_TARGET = 35;
+  const QUIZ_TARGET = 50;
   const MAPS_RESTRICTION_KEYWORDS = {
     vegetarian: "vegetarian",
     vegan: "vegan",
@@ -2370,7 +2370,7 @@
     }
     return `
       <div class="intro-steps">
-        ${flowStep("1", "Answer ~20 foods.")}
+        ${flowStep("1", "Answer ~50 foods.")}
         ${flowStep("2", "See your taste map.")}
         ${flowStep("3", "Send to a friend.")}
       </div>
