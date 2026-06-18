@@ -3228,28 +3228,73 @@
       return `
         <section class="path-tree" aria-label="Decision path">
           ${header}
-          <p class="path-tree__empty">Your answers branch out here as you go.</p>
+          <p class="path-tree__empty">Your answers appear here as you go.</p>
         </section>
       `;
     }
 
-    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 9);
+    const { visible, hiddenCount, activeParentId } = treeVisibleCards(quiz, 20);
     const activeCard = currentCard(quiz);
     const activeId = activeCard ? activeCard.id : null;
     const groups = groupTreeNodes(visible, activeId);
 
-    const spine = groups.map((group) => renderTreeGroup(group, quiz, activeId, activeParentId)).join("");
+    const chips = groups.map((group) => renderTreeChipGroup(group, quiz, activeId, activeParentId)).join("");
 
     const tail = hiddenCount > 0
-      ? `<p class="path-tree__hidden">+${hiddenCount} earlier ${hiddenCount === 1 ? "decision" : "decisions"} not shown</p>`
+      ? `<p class="path-tree__hidden">+${hiddenCount} earlier</p>`
       : "";
 
     return `
       <section class="path-tree" aria-label="Decision path">
         ${header}
-        <ol class="path-tree__spine">${spine}</ol>
+        <div class="path-tree__chips">${chips}</div>
         ${tail}
       </section>
+    `;
+  }
+
+  function cardEmoji(card) {
+    if (!card) return "\u{1F37D}️";
+    if (card.iconKey) return ingredientEmoji(card.iconKey);
+    if (card.cuisineId) return CUISINE_EMOJI[card.cuisineId] || "\u{1F37D}️";
+    if (card.modeRef) return modeEmoji(card.modeRef);
+    if (card.emoji) return card.emoji;
+    if (card.type === "ingredient" || card.type === "ingredient-probe") {
+      return ingredientEmoji(card.label || "");
+    }
+    return "\u{1F37D}️";
+  }
+
+  function renderTreeChipGroup(group, quiz, activeId, activeParentId) {
+    const parentChip = renderTreeChip(group.parent, quiz, activeId, activeParentId);
+    if (!group.children.length) return parentChip;
+    const childChips = group.children
+      .map((c) => renderTreeChip(c, quiz, activeId, activeParentId))
+      .join("");
+    return `
+      <div class="tree-group">
+        ${parentChip}
+        <div class="tree-branch-chips">${childChips}</div>
+      </div>
+    `;
+  }
+
+  function renderTreeChip(card, quiz, activeId, activeParentId) {
+    const value = quiz.responses[card.id];
+    const isActive = card.id === activeId;
+    const nodeState = treeState(value, isActive);
+    const classes = [
+      "tree-chip",
+      nodeState.key,
+      card.type === "ingredient-probe" ? "branch" : "",
+      card.id === activeParentId ? "parent-context" : "",
+    ].filter(Boolean).join(" ");
+    const title = `${card.label} (${nodeState.short || cardTypeLabel(card).toLowerCase()})`;
+    return `
+      <span class="${classes}" title="${esc(title)}" aria-label="${esc(title)}">
+        <span class="tree-chip__emoji">${esc(cardEmoji(card))}</span>
+        ${isActive ? `<span class="tree-chip__now">NOW</span>` : ""}
+      </span>
     `;
   }
 

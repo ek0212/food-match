@@ -1494,76 +1494,93 @@ input[type="text"]::placeholder {
   text-align: center;
 }
 
-.path-tree__spine {
+.path-tree__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.tree-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.tree-branch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  margin-left: 8px;
+}
+
+.tree-chip {
   position: relative;
-  list-style: none;
-  margin: 0;
-  padding: 4px 0 4px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: default;
+  line-height: 1;
+  transition: transform 0.12s ease;
 }
 
-.path-tree__spine::before {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 12px;
-  bottom: 12px;
-  width: 2px;
-  background: var(--line);
-  border-radius: 1px;
+.tree-chip:hover {
+  transform: translateY(-1px);
 }
 
-.tree-node {
-  position: relative;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 8px;
-  min-width: 0;
-  padding: 6px 0;
+.tree-chip__emoji {
+  font-size: 18px;
+  line-height: 1;
 }
 
-.path-tree__spine > .tree-node::before {
-  content: "";
-  position: absolute;
-  left: -11px;
-  top: 18px;
-  width: 9px;
-  height: 2px;
-  background: var(--line);
-  border-radius: 1px;
+.tree-chip__now {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.5rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.tree-branch {
-  position: relative;
-  list-style: none;
-  margin: 2px 0 4px 18px;
-  padding: 0 0 0 14px;
+.tree-chip.yes {
+  border-color: var(--green);
+  background: var(--green-soft);
 }
 
-.tree-branch::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: -2px;
-  bottom: 10px;
-  width: 2px;
-  background: var(--line);
+.tree-chip.no {
+  border-color: #e0a096;
+  background: var(--red-soft);
 }
 
-.tree-branch > .tree-node::before {
-  content: "";
-  position: absolute;
-  left: -14px;
-  top: 18px;
-  width: 12px;
-  height: 2px;
-  background: var(--line);
+.tree-chip.unknown,
+.tree-chip.neutral {
+  border-color: var(--line);
+  background: var(--surface-2);
+  opacity: 0.78;
 }
 
-.tree-node.parent-context {
-  background: rgba(230, 238, 247, 0.6);
-  border-radius: 6px;
-  padding: 6px 6px;
-  margin-left: -4px;
+.tree-chip.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  box-shadow: 0 0 0 3px rgba(49, 95, 145, 0.18);
+}
+
+.tree-chip.branch .tree-chip__emoji {
+  font-size: 15px;
+}
+
+.tree-chip.parent-context {
+  border-color: var(--blue);
+  background: var(--blue-soft);
 }
 
 .tree-marker {
