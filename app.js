@@ -3054,11 +3054,6 @@
           <p>The quiz is about <em>cuisine and taste preferences</em>, where "what people actually cook together" is the right signal. Chem would say weird things like "you liked aged parmesan, so try natto" (both umami, no shared cuisine).</p>
           <p>This app bundles only the Cooc variant: ${ingredientsStr} ingredients, ${totalModes} modes, hand-tagged with ${cuisineCount} cuisine macro-regions from appendix C of the paper.</p>
         </div>
-
-        <div class="about-block">
-          <h3>Source files</h3>
-          <p>Everything ships as a single static JSON bundle under <code>data/epicure.json</code>. Original CSVs are linked from the <a href="${EPICURE_PAPER_URL}" target="_blank" rel="noopener">arxiv paper</a> under "ancillary files".</p>
-        </div>
       </section>
     `);
   }
