@@ -1624,7 +1624,7 @@
     return disliked;
   }
 
-  function suggestRestaurants(profile) {
+  function scoreRestaurants(profile) {
     const liked = profileLikedIngredients(profile);
     const disliked = profileDislikedIngredients(profile);
     const affinities = cuisineAffinities(profile);
@@ -1651,11 +1651,22 @@
       return { ...r, score, hits: hits.length, hitKeys: hits, misses: misses.length, missKeys: misses, blockedCount, topCuisineAffinity };
     })
     .filter(Boolean)
-    .filter((r) => r.score >= 4 && (r.hits >= 2 || r.topCuisineAffinity >= 2))
     .sort((a, b) => b.hits - a.hits || b.score - a.score);
   }
 
-  function suggestDishes(profile) {
+  function suggestRestaurants(profile) {
+    return scoreRestaurants(profile)
+      .filter((r) => r.score >= 4 && (r.hits >= 2 || r.topCuisineAffinity >= 2));
+  }
+
+  // Best pick when nothing clears the confidence gate. Still avoids net-negative
+  // or signal-free picks; null means there is genuinely nothing to suggest.
+  function closestRestaurant(profile) {
+    return scoreRestaurants(profile)
+      .find((r) => r.score > 0 && (r.hits >= 1 || r.topCuisineAffinity > 0)) || null;
+  }
+
+  function scoreDishes(profile) {
     const liked = profileLikedIngredients(profile);
     const disliked = profileDislikedIngredients(profile);
     const affinities = cuisineAffinities(profile);
@@ -1667,12 +1678,22 @@
       const misses = d.triggers.filter((t) => recommendationKeyMatches(disliked, t));
       if (misses.length > 0 || hits.length === 0) return null;
       const cuisineAffinity = Math.max(0, affinities[d.cuisine] || 0);
-      if (hits.length < 2 && cuisineAffinity < 2) return null;
       let score = hits.length * 3 + cuisineAffinity;
-      return { ...d, score, hits: hits.length, hitKeys: hits };
+      return { ...d, score, hits: hits.length, hitKeys: hits, cuisineAffinity };
     })
     .filter(Boolean)
     .sort((a, b) => b.hits - a.hits || b.score - a.score);
+  }
+
+  function suggestDishes(profile) {
+    return scoreDishes(profile)
+      .filter((d) => d.hits >= 2 || d.cuisineAffinity >= 2);
+  }
+
+  // Best dish when nothing clears the gate. scoreDishes already drops conflicts
+  // and zero-hit dishes, so its top entry is a safe closest match.
+  function closestDish(profile) {
+    return scoreDishes(profile)[0] || null;
   }
 
   function suggestFringeRecipes(profile) {
@@ -2129,6 +2150,21 @@
 
   // ─── NARRATIVE (results insight) ──────────────────────────────
 
+  // Mode labels that lead with a proper noun (region / cuisine) must keep
+  // their capital when dropped mid-sentence; everything else gets lowercased.
+  const PROPER_LABEL_PREFIXES = new Set([
+    "East", "East-Asian", "Southeast", "South", "Asian", "Pan-Asian",
+    "Mediterranean", "Italian-Mediterranean", "Italian", "European",
+    "Chinese", "Japanese", "Indonesian", "Mexican", "Tex-Mex",
+    "Latin", "Western",
+  ]);
+
+  function lowerLeadLabel(label) {
+    const first = label.split(" ")[0];
+    if (PROPER_LABEL_PREFIXES.has(first)) return label;
+    return label.charAt(0).toLowerCase() + label.slice(1);
+  }
+
   function generateNarrative(profile) {
     const adventure = adventureScore(profile);
     const taste = tasteSignature(profile);
@@ -2190,7 +2226,7 @@
 
     // Flavor categories liked
     if (likedModes.length >= 2) {
-      parts.push(`You gravitate toward ${likedModes.slice(0, 2).join(" and ").toLowerCase()}.`);
+      parts.push(`You gravitate toward ${likedModes.slice(0, 2).map(lowerLeadLabel).join(" and ")}.`);
     }
 
     // Specific ingredients
@@ -2780,8 +2816,16 @@
     const heroSummary = generateHeroSummary(profile);
     const answersCount = Object.keys(profile.responses || {}).length;
     const topCuisine = cuisineEvidence.filter((c) => c.score > 0).sort((a, b) => b.score - a.score)[0] || null;
-    const topRestaurant = restaurants[0];
-    const topDish = dishes[0];
+    const closestRest = restaurants.length ? null : closestRestaurant(profile);
+    const closestDishPick = dishes.length ? null : closestDish(profile);
+    const topRestaurant = restaurants[0] || closestRest;
+    const topDish = dishes[0] || closestDishPick;
+    const restPickSub = topRestaurant
+      ? (closestRest ? "Closest match" : (topRestaurant.hitKeys && topRestaurant.hitKeys.length ? formatIngredientList(topRestaurant.hitKeys, 2) : ""))
+      : "";
+    const dishPickSub = topDish
+      ? (closestDishPick ? "Closest match" : (topDish.hitKeys && topDish.hitKeys.length ? formatIngredientList(topDish.hitKeys, 2) : ""))
+      : "";
     shell(`
       <section class="hero-v2">
         <div class="hero-copy">
@@ -2820,8 +2864,8 @@
         <div class="section-label">Top picks at a glance</div>
         <div class="top-picks-grid">
           ${topPickTile("\u{1F30D}", "Top region", topCuisine ? topCuisine.label : "No clear region yet", topCuisine ? cuisineBucket(topCuisine.score).label : "")}
-          ${topPickTile("\u{1F37D}️", "Restaurant fit", topRestaurant ? topRestaurant.name : "No confident match yet", topRestaurant && topRestaurant.hitKeys && topRestaurant.hitKeys.length ? `${formatIngredientList(topRestaurant.hitKeys, 2)}` : "")}
-          ${topPickTile("\u{1F374}", "Dish idea", topDish ? topDish.dish : "No confident match yet", topDish && topDish.hitKeys && topDish.hitKeys.length ? `${formatIngredientList(topDish.hitKeys, 2)}` : "")}
+          ${topPickTile("\u{1F37D}️", "Restaurant fit", topRestaurant ? topRestaurant.name : "No confident match yet", restPickSub)}
+          ${topPickTile("\u{1F374}", "Dish idea", topDish ? topDish.dish : "No confident match yet", dishPickSub)}
         </div>
       </section>
 
@@ -2881,7 +2925,11 @@
           <h3>Restaurant fit</h3>
           <p class="panel-hint">(category, not a specific spot)</p>
           <div class="recommendation-list">
-            ${restaurants.length ? restaurants.map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
+            ${restaurants.length
+              ? restaurants.map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("")
+              : (closestRest
+                ? `<p class="panel-hint">No high-confidence fit. Closest:</p>${renderRestaurantCard(closestRest, { stylePrefix: true })}`
+                : `<div class="empty-state">No confident restaurant match yet.</div>`)}
           </div>
         </div>
 
@@ -2889,7 +2937,11 @@
           <div class="section-label">What to order</div>
           <h3>Dish ideas</h3>
           <div class="dish-stack">
-            ${dishes.length ? dishes.map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
+            ${dishes.length
+              ? dishes.map(renderDishCard).join("")
+              : (closestDishPick
+                ? `<p class="panel-hint">No high-confidence pick. Closest:</p>${renderDishCard(closestDishPick)}`
+                : `<div class="empty-state">No confident dish match yet.</div>`)}
           </div>
         </div>
 
