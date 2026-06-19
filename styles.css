@@ -2314,6 +2314,14 @@ input[type="text"]::placeholder {
   font-weight: 900;
 }
 
+.cuisine-emoji,
+.taste-emoji,
+.rest-emoji,
+.dish-emoji {
+  display: inline-block;
+  margin-right: 6px;
+}
+
 .bridge-group + .bridge-group {
   margin-top: 12px;
 }

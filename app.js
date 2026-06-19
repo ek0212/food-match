@@ -187,6 +187,85 @@
     herbal: "Herbal",
   };
 
+  const TASTE_DIMENSION_EMOJI = {
+    umami: "\u{1F344}",
+    fresh: "\u{1F33F}",
+    rich: "\u{1F9C8}",
+    spicy: "\u{1F336}️",
+    sweet: "\u{1F36F}",
+    earthy: "\u{1FAB5}",
+    funky: "\u{1F9C0}",
+    herbal: "\u{1F33F}",
+  };
+
+  const DISH_EMOJI = {
+    "Greek salad": "\u{1F957}",
+    "Caesar salad": "\u{1F957}",
+    "Cobb salad": "\u{1F957}",
+    "Caprese salad": "\u{1F957}",
+    "Cheese board": "\u{1F9C0}",
+    "Bruschetta": "\u{1F35E}",
+    "Grilled halloumi": "\u{1F9C0}",
+    "Labneh with olive oil": "\u{1FAD2}",
+    "Caponata": "\u{1F346}",
+    "Beet & goat cheese salad": "\u{1F957}",
+    "Miso ramen": "\u{1F35C}",
+    "Sashimi platter": "\u{1F363}",
+    "Tempura udon": "\u{1F35C}",
+    "Takoyaki": "\u{1F419}",
+    "Unagi don": "\u{1F35A}",
+    "Natto rice bowl": "\u{1F35A}",
+    "Miso soup": "\u{1F963}",
+    "Mapo tofu": "\u{1F336}️",
+    "Kung pao chicken": "\u{1F357}",
+    "Dan dan noodles": "\u{1F35C}",
+    "Wontons in chili oil": "\u{1F95F}",
+    "Kimchi jjigae": "\u{1F963}",
+    "Korean fried chicken": "\u{1F357}",
+    "Mushroom stir-fry": "\u{1F344}",
+    "Black bean noodles": "\u{1F35C}",
+    "Century egg congee": "\u{1F35A}",
+    "Xiao long bao": "\u{1F95F}",
+    "Pad thai": "\u{1F35C}",
+    "Green curry": "\u{1F35B}",
+    "Tom yum soup": "\u{1F963}",
+    "Pho": "\u{1F35C}",
+    "Laksa": "\u{1F35C}",
+    "Chicken tikka masala": "\u{1F35B}",
+    "Butter chicken": "\u{1F35B}",
+    "Biryani": "\u{1F35A}",
+    "Dosa with sambar": "\u{1F95E}",
+    "Chana masala": "\u{1F35B}",
+    "Dal makhani": "\u{1F35B}",
+    "Pizza margherita": "\u{1F355}",
+    "Pasta carbonara": "\u{1F35D}",
+    "Cacio e pepe": "\u{1F35D}",
+    "Risotto": "\u{1F35A}",
+    "Spaghetti pomodoro": "\u{1F35D}",
+    "Tacos al pastor": "\u{1F32E}",
+    "Carnitas tacos": "\u{1F32E}",
+    "Mole poblano": "\u{1F36B}",
+    "Ceviche": "\u{1F990}",
+    "Steak frites": "\u{1F969}",
+    "Cheeseburger": "\u{1F354}",
+    "Roast chicken": "\u{1F357}",
+    "Mac and cheese": "\u{1F9C0}",
+    "Borscht": "\u{1F963}",
+    "Pierogi": "\u{1F95F}",
+  };
+
+  function emojiForCuisine(cuisineId) {
+    return CUISINE_EMOJI[cuisineId] || "\u{1F37D}️";
+  }
+
+  function emojiForDish(dish, cuisineId) {
+    return DISH_EMOJI[dish] || emojiForCuisine(cuisineId);
+  }
+
+  function emojiForTaste(key) {
+    return TASTE_DIMENSION_EMOJI[key] || "\u{1F37D}️";
+  }
+
   const {
     RESTRICTIONS,
     getIngredientTags,
@@ -2752,13 +2831,13 @@
         <a href="#section-share">Restaurant search prompts</a>
       </nav>
 
-      <h3 class="results-section-heading" id="section-taste">\u{1F60B} Your taste</h3>
+      <h3 class="results-section-heading" id="section-taste">Your taste</h3>
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="panel-heading">
             <div>
               <div class="section-label">Cuisine compass</div>
-              <h3>\u{1F30D} Regional evidence</h3>
+              <h3>Regional evidence</h3>
             </div>
           </div>
           ${renderCuisineEvidence(cuisineEvidence)}
@@ -2766,29 +2845,27 @@
 
         <div class="panel panel-soft">
           <div class="section-label">Taste spectrum</div>
-          <h3>\u{1F308} Top flavors</h3>
+          <h3>Top flavors</h3>
           ${renderTasteBars(taste)}
         </div>
 
         <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Evidence</div>
-          <h3>\u{1F4DD} What shaped your result</h3>
+          <h3>What shaped your result</h3>
           <div class="split-evidence">
             <div>
               <div class="subhead">Likes</div>
-              <div class="food-grid">${liked.length ? liked.slice(0, 5).map((f) => renderFoodTag(f)).join("") : `<span class="food-tag dim">No strong likes</span>`}</div>
-              ${liked.length > 5 ? `<div class="food-grid extra" hidden>${liked.slice(5).map((f) => renderFoodTag(f)).join("")}</div><button type="button" class="link-toggle" data-toggle-target="extra">Show ${liked.length - 5} more</button>` : ""}
+              <div class="food-grid">${liked.length ? liked.map((f) => renderFoodTag(f)).join("") : `<span class="food-tag dim">No strong likes</span>`}</div>
             </div>
             <div>
               <div class="subhead">Passes</div>
-              <div class="food-grid">${disliked.length ? disliked.slice(0, 5).map((f) => renderFoodTag(f, "conflict")).join("") : `<span class="food-tag dim">No hard passes</span>`}</div>
-              ${disliked.length > 5 ? `<div class="food-grid extra" hidden>${disliked.slice(5).map((f) => renderFoodTag(f, "conflict")).join("")}</div><button type="button" class="link-toggle" data-toggle-target="extra">Show ${disliked.length - 5} more</button>` : ""}
+              <div class="food-grid">${disliked.length ? disliked.map((f) => renderFoodTag(f, "conflict")).join("") : `<span class="food-tag dim">No hard passes</span>`}</div>
             </div>
           </div>
         </div>
       </section>
 
-      <h3 class="results-section-heading" id="section-eat">\u{1F37D}️ Where to eat &amp; what to order</h3>
+      <h3 class="results-section-heading" id="section-eat">Where to eat &amp; what to order</h3>
       <div class="chip-legend" aria-label="Chip color guide">
         <span class="reason-chip hit">Ingredient ✓</span>
         <span class="legend-note">A yes from you</span>
@@ -2801,31 +2878,31 @@
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="section-label">Where to eat</div>
-          <h3>\u{1F3DB}️ Restaurant fit</h3>
+          <h3>Restaurant fit</h3>
           <p class="panel-hint">(category, not a specific spot)</p>
           <div class="recommendation-list">
-            ${restaurants.length ? restaurants.slice(0, 5).map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
+            ${restaurants.length ? restaurants.map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
           </div>
         </div>
 
         <div class="panel panel-soft">
           <div class="section-label">What to order</div>
-          <h3>\u{1F35C} Dish ideas</h3>
+          <h3>Dish ideas</h3>
           <div class="dish-stack">
-            ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
+            ${dishes.length ? dishes.map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
           </div>
         </div>
 
         <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Fringe recipes</div>
-          <h3>\u{2728} Try something new</h3>
+          <h3>Try something new</h3>
           <div class="fringe-list">
             ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
           </div>
         </div>
       </section>
 
-      <h3 class="results-section-heading" id="section-share">\u{1F50D} Restaurant search prompts</h3>
+      <h3 class="results-section-heading" id="section-share">Restaurant search prompts</h3>
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-full panel-soft prompt-split">
           <div class="section-label">Find places near me</div>
@@ -3434,10 +3511,11 @@
       if (row.direct != null) parts.push(`<span>From cuisine answer: ${esc(answerLabel(row.direct))}</span>`);
       if (clusterLabel !== "No signal") parts.push(`<span>From related groups: ${esc(clusterLabel)}</span>`);
       if (ingredientLabel !== "No signal") parts.push(`<span>From specific foods: ${esc(ingredientLabel)}</span>`);
+      const emoji = emojiForCuisine(row.id);
       return `
         <div class="cuisine-card ${cuisineTone(row)}">
           <div class="cuisine-card-top">
-            <strong>${esc(row.label)}</strong>
+            <strong><span class="cuisine-emoji" aria-hidden="true">${emoji}</span>${esc(row.label)}</strong>
             <span>${esc(bucket.label)}</span>
           </div>
           <div class="cuisine-bucket-caption">${esc(bucket.caption)}</div>
@@ -3445,14 +3523,9 @@
         </div>
       `;
     };
-    const strong = ordered.filter((row) => cuisineSignalLabel(row.score) !== "No clear pull");
-    const weak = ordered.filter((row) => cuisineSignalLabel(row.score) === "No clear pull");
-    const visible = strong.length ? strong : weak.slice(0, 3);
-    const hidden = strong.length ? weak : weak.slice(3);
     return `
       <div class="cuisine-evidence">
-        ${visible.map(renderCard).join("")}
-        ${hidden.length ? `<div class="cuisine-weak" hidden>${hidden.map(renderCard).join("")}</div><button type="button" class="link-toggle" data-toggle-target="cuisine-weak">Show ${hidden.length} more</button>` : ""}
+        ${ordered.map(renderCard).join("")}
       </div>
     `;
   }
@@ -3498,10 +3571,9 @@
     const rows = Object.entries(taste)
       .filter(([, value]) => value !== 0)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
       .map(([key, value]) => `
         <div class="taste-row">
-          <span>${esc(TASTE_DIMENSION_LABELS[key] || key)}</span>
+          <span><span class="taste-emoji" aria-hidden="true">${emojiForTaste(key)}</span>${esc(TASTE_DIMENSION_LABELS[key] || key)}</span>
           <div class="taste-track"><i style="width:${Math.max(6, value * 10)}%"></i></div>
           <b>${value}</b>
         </div>
@@ -3537,9 +3609,10 @@
     const prefix = opts && opts.stylePrefix ? "Style: " : "";
     const cuisineNames = (r.cuisines || []).map((c) => CUISINE_DISPLAY[c] || c);
     const reasons = formatReasonChips(r.keys, r.hitKeys, cuisineNames);
+    const emoji = r.emoji || emojiForCuisine((r.cuisines || [])[0]);
     return `
       <div class="rest-card">
-        <div class="rest-title"><strong>${esc(prefix + r.name)}</strong></div>
+        <div class="rest-title"><span class="rest-emoji" aria-hidden="true">${emoji}</span><strong>${esc(prefix + r.name)}</strong></div>
         <div class="reason-chips">${reasons}</div>
       </div>
     `;
@@ -3548,9 +3621,10 @@
   function renderDishCard(d) {
     const cuisineName = CUISINE_DISPLAY[d.cuisine] || d.cuisine;
     const reasons = formatReasonChips(d.triggers || [], d.hitKeys, [cuisineName]);
+    const emoji = emojiForDish(d.dish, d.cuisine);
     return `
       <div class="dish-card">
-        <strong>${esc(d.dish)}</strong>
+        <strong><span class="dish-emoji" aria-hidden="true">${emoji}</span>${esc(d.dish)}</strong>
         <div class="reason-chips">${reasons}</div>
       </div>
     `;
