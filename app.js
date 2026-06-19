@@ -88,9 +88,9 @@
     { min: -Infinity, label: "Mostly no", caption: "You passed on most foods from this region." },
   ];
   const COMPATIBILITY_BUCKETS = [
-    { max: 25, label: "Far apart", caption: "Few shared likes, several conflicts. Compromise needed." },
+    { max: 25, label: "Far apart", caption: "Different palates, plenty of bridges to try." },
     { max: 55, label: "Workable", caption: "Some shared ground, watch for conflicts." },
-    { max: 80, label: "Aligned", caption: "Plenty of overlap, easy to plan a meal together." },
+    { max: 80, label: "Aligned", caption: "Lots of common ground." },
     { max: 100, label: "Twins", caption: "Almost the same palate." },
   ];
   const TASTE_QUIET_THRESHOLD = 3;
@@ -346,39 +346,6 @@
     "cheddar_cheese", "mozzarella_cheese", "butter", "milk", "cheese",
     "chicken", "turkey", "beef", "pork", "ham",
   ]);
-
-  const VIBE = {
-    adventure: {
-      low: ["gentle", "familiar", "comfort", "cozy"],
-      mid: ["curious", "open", "roaming", "exploring"],
-      high: ["bold", "daring", "fearless", "untamed"],
-    },
-    flavor: {
-      umami: ["deep", "layered", "savory-dark"],
-      fresh: ["bright", "crisp", "verdant"],
-      rich: ["lush", "velvet", "indulgent"],
-      spicy: ["electric", "fiery", "charged"],
-      sweet: ["honeyed", "golden", "soft"],
-      earthy: ["smoky", "grounded", "ember"],
-      funky: ["wild", "alive", "feral"],
-      herbal: ["botanical", "sun-lit", "aromatic"],
-    },
-    culture: {
-      East_Asian: ["pacific", "eastern"],
-      Southeast_Asian: ["equatorial", "monsoon"],
-      South_Asian: ["aromatic", "spiced"],
-      Mediterranean: ["coastal", "sun-warmed"],
-      Latin_American: ["tropical", "new-world"],
-      Western_Atlantic: ["atlantic", "hearth-side"],
-      Japanese: ["zen", "island"],
-    },
-    time: {
-      morning: ["dawn", "sunrise", "early light"],
-      afternoon: ["golden hour", "midday sun"],
-      evening: ["twilight", "dusk", "amber hour"],
-      night: ["midnight", "late night", "moonlit"],
-    },
-  };
 
   // ─── STATE ─────────────────────────────────────────────────────
 
@@ -1668,15 +1635,41 @@
   }
 
   function suggestSharedRestaurants(a, b) {
-    const aRecs = suggestRestaurants(a);
-    const bRecs = suggestRestaurants(b);
-    const bMap = {};
-    bRecs.forEach((r) => { bMap[r.name] = r; });
+    const aLiked = profileLikedIngredients(a);
+    const bLiked = profileLikedIngredients(b);
+    const aDisliked = profileDislikedIngredients(a);
+    const bDisliked = profileDislikedIngredients(b);
+    const aAffinities = cuisineAffinities(a);
+    const bAffinities = cuisineAffinities(b);
+    const aRestrictions = a.restrictions || [];
+    const bRestrictions = b.restrictions || [];
 
-    return aRecs
-      .filter((r) => bMap[r.name])
-      .map((r) => ({ ...r, score: r.score + bMap[r.name].score, hitKeys: [...new Set([...(r.hitKeys || []), ...(bMap[r.name].hitKeys || [])])] }))
-      .sort((x, y) => y.score - x.score);
+    return RESTAURANTS.map((r) => {
+      const aBlocked = r.keys.some((k) => !isRecommendationKeyAllowed(k, aRestrictions))
+        || restaurantBlockedTags(r, aRestrictions).length > 0;
+      const bBlocked = r.keys.some((k) => !isRecommendationKeyAllowed(k, bRestrictions))
+        || restaurantBlockedTags(r, bRestrictions).length > 0;
+      if (aBlocked || bBlocked) return null;
+
+      const aHits = r.keys.filter((k) => recommendationKeyMatches(aLiked, k));
+      const bHits = r.keys.filter((k) => recommendationKeyMatches(bLiked, k));
+      const aMissCount = r.keys.filter((k) => recommendationKeyMatches(aDisliked, k)).length;
+      const bMissCount = r.keys.filter((k) => recommendationKeyMatches(bDisliked, k)).length;
+      if (aMissCount > 0 || bMissCount > 0) return null;
+
+      const aAff = r.cuisines.reduce((m, c) => Math.max(m, aAffinities[c] || 0), 0);
+      const bAff = r.cuisines.reduce((m, c) => Math.max(m, bAffinities[c] || 0), 0);
+      const sharedHits = aHits.filter((k) => bHits.includes(k));
+      const combinedHits = aHits.length + bHits.length;
+      const cuisineEvidence = aAff >= 1 && bAff >= 1;
+      if (combinedHits < 2 && !cuisineEvidence) return null;
+
+      const score = combinedHits * 3 + sharedHits.length * 2 + Math.min(aAff, bAff);
+      const hitKeys = [...new Set([...aHits, ...bHits])];
+      return { ...r, score, hits: combinedHits, sharedHits: sharedHits.length, hitKeys };
+    })
+    .filter(Boolean)
+    .sort((x, y) => y.sharedHits - x.sharedHits || y.score - x.score);
   }
 
   function suggestSharedDishes(a, b) {
@@ -1782,7 +1775,6 @@
       `Where should ${aName} and ${bName} go together? Use our current location in Google Maps or Ask Maps, then recommend restaurants that satisfy both profiles.`,
       "",
       "Shared fit:",
-      `- Match score: ${result.score}/100.`,
       `- Things we both like or can safely build around: ${formatPromptList(sharedLikes, "No exact overlaps yet")}.`,
       `- Shared cuisine or regional directions: ${formatPromptList(sharedDirections, "No shared region signal yet")}.`,
       `- Shared dish directions: ${formatPromptList(sharedDishes, "Use cuisine and ingredient signals instead")}.`,
@@ -2163,46 +2155,6 @@
     if (ratio >= 0.45) return "You said yes to about half of the divisive foods we asked about.";
     if (ratio >= 0.2) return "You said yes to a few of the divisive foods we asked about.";
     return "You passed on most of the divisive foods we asked about.";
-  }
-
-  // ─── DAYLIST ───────────────────────────────────────────────────
-
-  function generateDaylist(profile) {
-    const seed = profile.id || "default";
-    const adv = adventureScore(profile);
-    const advTier = adv > 65 ? "high" : adv > 35 ? "mid" : "low";
-    const advWord = seededPick(VIBE.adventure[advTier], seed + "adv");
-
-    const taste = tasteSignature(profile);
-    const sortedDims = Object.entries(taste).sort((a, b) => b[1] - a[1]);
-    const topDim = sortedDims[0] ? sortedDims[0][0] : "umami";
-    const flavorWord = seededPick(VIBE.flavor[topDim] || VIBE.flavor.umami, seed + "flav");
-
-    const affinities = cuisineAffinities(profile);
-    const topCuisine = Object.entries(affinities).sort((a, b) => b[1] - a[1])[0];
-    const cultureWord = topCuisine && topCuisine[1] > 0
-      ? seededPick(VIBE.culture[topCuisine[0]] || ["wandering"], seed + "cult")
-      : "wandering";
-
-    const hour = new Date().getHours();
-    const timePeriod = hour < 5 ? "night" : hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 22 ? "evening" : "night";
-    const timeWord = seededPick(VIBE.time[timePeriod], seed + "time");
-
-    return `${advWord} ${flavorWord} ${cultureWord} ${timeWord}`;
-  }
-
-  function hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) - hash) + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return hash;
-  }
-
-  function seededPick(arr, seed) {
-    if (!arr || !arr.length) return "";
-    return arr[Math.abs(hashCode(seed)) % arr.length];
   }
 
   // ─── STORAGE ───────────────────────────────────────────────────
@@ -2730,7 +2682,6 @@
     const profile = state.profile;
     if (!profile) return renderSetup();
 
-    const daylist = generateDaylist(profile);
     const adventure = adventureBreakdown(profile);
     const narrative = generateNarrative(profile);
     const cuisineEvidence = buildCuisineEvidence(profile);
@@ -2758,7 +2709,6 @@
           <div class="eyebrow">${namePossessive} palate</div>
           <h2>${esc(heroSummary)}</h2>
           <p>${esc(narrative)}</p>
-          <p class="hero-daylist"><em>${esc(daylist)}</em></p>
           <div class="hero-cta-row">
             <button class="btn btn-cta" data-action="share-invite">Invite a friend to compare</button>
             <button class="btn" data-action="share-profile">Copy profile link</button>
@@ -2802,13 +2752,13 @@
         <a href="#section-share">Restaurant search prompts</a>
       </nav>
 
-      <h3 class="results-section-heading" id="section-taste">Your taste</h3>
+      <h3 class="results-section-heading" id="section-taste">\u{1F60B} Your taste</h3>
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="panel-heading">
             <div>
               <div class="section-label">Cuisine compass</div>
-              <h3>Regional evidence</h3>
+              <h3>\u{1F30D} Regional evidence</h3>
             </div>
           </div>
           ${renderCuisineEvidence(cuisineEvidence)}
@@ -2816,13 +2766,13 @@
 
         <div class="panel panel-soft">
           <div class="section-label">Taste spectrum</div>
-          <h3>Top flavors</h3>
+          <h3>\u{1F308} Top flavors</h3>
           ${renderTasteBars(taste)}
         </div>
 
         <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Evidence</div>
-          <h3>What shaped your result</h3>
+          <h3>\u{1F4DD} What shaped your result</h3>
           <div class="split-evidence">
             <div>
               <div class="subhead">Likes</div>
@@ -2838,7 +2788,7 @@
         </div>
       </section>
 
-      <h3 class="results-section-heading" id="section-eat">Where to eat &amp; what to order</h3>
+      <h3 class="results-section-heading" id="section-eat">\u{1F37D}️ Where to eat &amp; what to order</h3>
       <div class="chip-legend" aria-label="Chip color guide">
         <span class="reason-chip hit">Ingredient ✓</span>
         <span class="legend-note">A yes from you</span>
@@ -2851,7 +2801,7 @@
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="section-label">Where to eat</div>
-          <h3>Restaurant fit</h3>
+          <h3>\u{1F3DB}️ Restaurant fit</h3>
           <p class="panel-hint">(category, not a specific spot)</p>
           <div class="recommendation-list">
             ${restaurants.length ? restaurants.slice(0, 5).map((r) => renderRestaurantCard(r, { stylePrefix: true })).join("") : `<div class="empty-state">No confident restaurant match yet.</div>`}
@@ -2860,7 +2810,7 @@
 
         <div class="panel panel-soft">
           <div class="section-label">What to order</div>
-          <h3>Dish ideas</h3>
+          <h3>\u{1F35C} Dish ideas</h3>
           <div class="dish-stack">
             ${dishes.length ? dishes.slice(0, 6).map(renderDishCard).join("") : `<div class="empty-state">No confident dish match yet.</div>`}
           </div>
@@ -2868,14 +2818,14 @@
 
         <div class="panel panel-wide panel-full panel-soft">
           <div class="section-label">Fringe recipes</div>
-          <h3>Try something new</h3>
+          <h3>\u{2728} Try something new</h3>
           <div class="fringe-list">
             ${fringeRecipes.length ? fringeRecipes.map(renderFringeRecipeCard).join("") : `<div class="empty-state">No safe fringe recipe match yet.</div>`}
           </div>
         </div>
       </section>
 
-      <h3 class="results-section-heading" id="section-share">Restaurant search prompts</h3>
+      <h3 class="results-section-heading" id="section-share">\u{1F50D} Restaurant search prompts</h3>
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-full panel-soft prompt-split">
           <div class="section-label">Find places near me</div>
@@ -2918,10 +2868,12 @@
           <h2>${esc(aName)} <span>and</span> ${esc(bName)}</h2>
           <p>${sharedSignalCount} shared signals, ${result.conflicts.length} watch-outs, ${result.bridges.length} possible introductions.</p>
         </div>
-        <div class="score-dial">
-          <span class="score-dial-label">${esc(compatibilityBucket(result.score).label)}</span>
-          <small>compatibility</small>
-          <em>${esc(compatibilityBucket(result.score).caption)}</em>
+        <div class="score-dial-wrap">
+          <div class="score-dial">
+            <span class="score-dial-label">${esc(compatibilityBucket(result.score).label)}</span>
+            <small>compatibility</small>
+          </div>
+          <p class="score-dial-caption">${esc(compatibilityBucket(result.score).caption)}</p>
         </div>
       </section>
 
@@ -2993,13 +2945,19 @@
           <div class="section-label">Try together</div>
           <h3>Bridge foods</h3>
           <p class="panel-hint">One person likes it, the other has not ruled it out.</p>
-          <div class="food-grid">
-            ${result.bridges.length ? result.bridges.map((f) => `
-              <span class="food-tag bridge">${esc(f.label)}
-                <small>${f.from === "a" ? esc(aName) + " recommends" : esc(bName) + " recommends"}</small>
-              </span>
-            `).join("") : `<span class="food-tag dim">No bridge foods yet</span>`}
-          </div>
+          ${result.bridges.length ? (() => {
+            const fromA = result.bridges.filter((f) => f.from === "a");
+            const fromB = result.bridges.filter((f) => f.from === "b");
+            const group = (title, items) => items.length ? `
+              <div class="bridge-group">
+                <div class="subhead">${esc(title)} could introduce</div>
+                <div class="food-grid">
+                  ${items.map((f) => `<span class="food-tag bridge">${esc(f.label)}</span>`).join("")}
+                </div>
+              </div>
+            ` : "";
+            return group(aName, fromA) + group(bName, fromB);
+          })() : `<div class="food-grid"><span class="food-tag dim">No bridge foods yet</span></div>`}
         </div>
 
         <div class="panel panel-actions">
@@ -3617,7 +3575,6 @@
       <div class="fringe-card">
         <div class="fringe-card-top">
           <strong>${esc(recipe.title)}</strong>
-          <span title="How far this dish leans into adventurous flavors. 1 = familiar, 10 = extreme.">Adventure ${recipe.fringe}/10</span>
         </div>
         <p>${esc(recipe.note)}</p>
         <div class="reason-chips">${reasons}</div>

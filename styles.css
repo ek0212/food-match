@@ -858,10 +858,6 @@ input[type="text"]::placeholder {
   line-height: 1.45;
 }
 
-.hero-v2 .hero-daylist {
-  font-size: 0.92rem;
-}
-
 .hero-cta-row {
   display: flex;
   flex-wrap: wrap;
@@ -1728,9 +1724,21 @@ input[type="text"]::placeholder {
   text-align: center;
 }
 
-.compare-hero > .score-dial {
+.compare-hero > .score-dial-wrap {
   justify-self: end;
   align-self: center;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  max-width: 220px;
+}
+
+.score-dial-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .score-dial span {
@@ -1758,15 +1766,6 @@ input[type="text"]::placeholder {
   text-transform: uppercase;
 }
 
-.score-dial em {
-  display: block;
-  max-width: 14ch;
-  color: var(--muted);
-  font-size: 0.58rem;
-  font-style: normal;
-  font-weight: 750;
-  line-height: 1.08;
-}
 
 .score-copy {
   display: grid;
@@ -1861,13 +1860,6 @@ input[type="text"]::placeholder {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   scroll-margin-top: 72px;
-}
-
-.hero-daylist {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-style: italic;
 }
 
 .prompt-split-grid {
@@ -2320,6 +2312,10 @@ input[type="text"]::placeholder {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 900;
+}
+
+.bridge-group + .bridge-group {
+  margin-top: 12px;
 }
 
 .food-grid {
