@@ -3617,7 +3617,7 @@
       <div class="fringe-card">
         <div class="fringe-card-top">
           <strong>${esc(recipe.title)}</strong>
-          <span>Stretch ${recipe.fringe}/10</span>
+          <span title="How far this dish leans into adventurous flavors. 1 = familiar, 10 = extreme.">Adventure ${recipe.fringe}/10</span>
         </div>
         <p>${esc(recipe.note)}</p>
         <div class="reason-chips">${reasons}</div>
