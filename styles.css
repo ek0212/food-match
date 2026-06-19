@@ -2239,6 +2239,31 @@ input[type="text"]::placeholder {
   line-height: 1.4;
 }
 
+.chip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.chip-legend .legend-note {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.legend-rank {
+  margin: -8px 0 14px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 .reason-chip.hit {
   border-color: var(--green);
   background: var(--green-soft);

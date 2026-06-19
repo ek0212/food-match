@@ -1606,7 +1606,7 @@
     })
     .filter(Boolean)
     .filter((r) => r.score >= 4 && (r.hits >= 2 || r.topCuisineAffinity >= 2))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.hits - a.hits || b.score - a.score);
   }
 
   function suggestDishes(profile) {
@@ -1623,10 +1623,10 @@
       const cuisineAffinity = Math.max(0, affinities[d.cuisine] || 0);
       if (hits.length < 2 && cuisineAffinity < 2) return null;
       let score = hits.length * 3 + cuisineAffinity;
-      return { ...d, score, hitKeys: hits };
+      return { ...d, score, hits: hits.length, hitKeys: hits };
     })
     .filter(Boolean)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.hits - a.hits || b.score - a.score);
   }
 
   function suggestFringeRecipes(profile) {
@@ -2839,6 +2839,15 @@
       </section>
 
       <h3 class="results-section-heading" id="section-eat">Where to eat &amp; what to order</h3>
+      <div class="chip-legend" aria-label="Chip color guide">
+        <span class="reason-chip hit">Ingredient ✓</span>
+        <span class="legend-note">A yes from you</span>
+        <span class="reason-chip">Ingredient</span>
+        <span class="legend-note">Related — same cuisine or pattern as your yeses</span>
+        <span class="reason-chip cuisine">Cuisine</span>
+        <span class="legend-note">Regional tag</span>
+      </div>
+      <p class="legend-note legend-rank">Ranked by how many of your yeses each pick contains, then by cuisine pull.</p>
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="section-label">Where to eat</div>
@@ -3593,7 +3602,7 @@
     const hitSet = new Set(hitKeys || []);
     const keyChips = (allKeys || []).map((k) => {
       const hit = hitSet.has(k);
-      return `<span class="reason-chip ${hit ? "hit" : ""}" title="${hit ? "You liked this" : "Part of this recommendation"}">${esc(displayName(k))}${hit ? " ✓" : ""}</span>`;
+      return `<span class="reason-chip ${hit ? "hit" : ""}" title="${hit ? "You said yes to this" : "Related to your yeses — same cuisine or pattern"}">${esc(displayName(k))}${hit ? " ✓" : ""}</span>`;
     });
     const extras = (extra || []).filter(Boolean).map((label) =>
       `<span class="reason-chip cuisine">${esc(label)}</span>`
