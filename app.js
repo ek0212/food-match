@@ -263,7 +263,7 @@
     asafoetida: ["\u{1F33F}", "Pungent sulfurous spice, mellows when cooked", 5],
     tofu: ["\u{1F9C6}", "Mild soy curd, absorbs surrounding flavors", 2],
     tempeh: ["\u{1F9C6}", "Fermented soybean cake, nutty and firm", 3],
-    stinky_tofu: ["\u{1F9EB}", "Fermented tofu with a famously intense smell", 9],
+    stinky_tofu: ["\u{1FAD9}", "Fermented tofu with a famously intense smell", 9],
     fermented_black_bean: ["\u{1FAD8}", "Salty, pungent preserved soybeans", 4],
     shrimp_paste: ["\u{1F9C2}", "Concentrated fermented shrimp, powerfully funky", 7],
     okra: ["\u{1F33F}", "Pod vegetable, slimy when cooked, divisive texture", 5],
@@ -1007,7 +1007,7 @@
 
   function modeEmoji(mode) {
     const l = mode.label.toLowerCase();
-    if (l.includes("ferment") || l.includes("umami")) return "\u{1F9EB}";
+    if (l.includes("ferment") || l.includes("umami")) return "\u{1FAD9}";
     if (l.includes("seafood") || l.includes("fish") || l.includes("dashi")) return "\u{1F41F}";
     if (l.includes("cheese") || l.includes("dairy")) return "\u{1F9C0}";
     if (l.includes("spice") || l.includes("chile") || l.includes("pepper")) return "\u{1F336}\uFE0F";
@@ -3520,10 +3520,10 @@
   }
 
   function contributionLabel(value) {
-    if (value >= 1) return "Support";
-    if (value > 0.1) return "Light support";
-    if (value <= -1) return "Push away";
-    if (value < -0.1) return "Light push away";
+    if (value >= 1) return "Pull";
+    if (value > 0.1) return "Soft pull";
+    if (value <= -1) return "Push";
+    if (value < -0.1) return "Soft push";
     return "No signal";
   }
 
