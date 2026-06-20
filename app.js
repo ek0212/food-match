@@ -84,7 +84,7 @@
   const CUISINE_BUCKETS = [
     { min: 3, label: "Big yes", caption: "You kept saying yes to foods from here." },
     { min: 1, label: "Mostly yes", caption: "More yeses than nos from this region." },
-    { min: -1, label: "Mixed", caption: "Some yes, some no. No clear pull." },
+    { min: -1, label: "Mixed", caption: "Some yes, some no. No clear lean." },
     { min: -Infinity, label: "Mostly no", caption: "You passed on most foods from this region." },
   ];
   const COMPATIBILITY_BUCKETS = [
@@ -1834,7 +1834,7 @@
       `${opener} Use my current location in Google Maps or Ask Maps, then suggest specific places and explain why each one fits.`,
       "",
       "My strongest food signals:",
-      `- Cuisines or regions I seem pulled toward: ${formatPromptList(cuisines, "No clear region yet")}.`,
+      `- Cuisines or regions I seem drawn toward: ${formatPromptList(cuisines, "No clear region yet")}.`,
       `- Foods and flavors I like: ${formatPromptList(liked, "No strong likes yet")}.`,
       `- Flavor center: ${formatPromptList(taste, "No clear flavor center yet")}.`,
       `- Foods I want to avoid or treat carefully: ${formatPromptList(disliked, "No hard passes captured")}.`,
@@ -1880,7 +1880,7 @@
       `- Shared dish directions: ${formatPromptList(sharedDishes, "Use cuisine and ingredient signals instead")}.`,
       `- Restaurant categories already suggested by the matcher: ${formatPromptList(sharedRestaurants, "No confident shared restaurant category yet")}.`,
       "",
-      "Individual pulls:",
+      "Individual leans:",
       `- ${aName}: ${formatPromptList(aCuisines, "No strong region yet")}.`,
       `- ${bName}: ${formatPromptList(bCuisines, "No strong region yet")}.`,
       "",
@@ -2421,7 +2421,7 @@
       return `
         <div class="intro-steps">
           <div class="flow-step"><b>1</b><span>Cuisines first: pick <span class="intro-red">recipe families</span>.</span></div>
-          <div class="flow-step"><b>2</b><span>Yes pulls in a neighborhood; no fences it off.</span></div>
+          <div class="flow-step"><b>2</b><span>Yes opens up a neighborhood; no fences it off.</span></div>
           <div class="flow-step"><b>3</b><span><span class="intro-red">Edge ingredients</span> separate dislikes from generalizations.</span></div>
         </div>
       `;
@@ -2918,7 +2918,7 @@
         <span class="reason-chip cuisine">Cuisine</span>
         <span class="legend-note">Regional tag</span>
       </div>
-      <p class="legend-note legend-rank">Ranked by how many of your yeses each pick contains, then by cuisine pull.</p>
+      <p class="legend-note legend-rank">Ranked by how many of your yeses each pick contains, then by cuisine lean.</p>
       <section class="dashboard-grid">
         <div class="panel panel-wide panel-soft">
           <div class="section-label">Where to eat</div>
@@ -3035,7 +3035,7 @@
         <div class="panel panel-wide">
           <div class="section-label">You both like</div>
           <h3>Common ground</h3>
-          <p class="panel-hint">Exact overlaps are safest; shared regional pulls catch compatible nearby tastes.</p>
+          <p class="panel-hint">Exact overlaps are safest; shared regional leanings catch compatible nearby tastes.</p>
           <div class="food-grid">
             ${result.sharedLikes.length || result.sharedDirections.length
               ? [...result.sharedLikes, ...result.sharedDirections].map((f) => renderFoodTag(f, f.type === "direction" ? "bridge" : "")).join("")
@@ -3232,7 +3232,7 @@
         return `Top recipe neighborhood after your yes to ${joinNatural(likedCuisines)}. Recipes in this group share ingredients that often appear together in cooking data.`;
       }
       if (passedCuisines.length) {
-        return `No clear yes on a region yet, so we pull from broad recipe neighborhoods while skipping ones tied to ${joinNatural(passedCuisines)}.`;
+        return `No clear yes on a region yet, so we draw from broad recipe neighborhoods while skipping ones tied to ${joinNatural(passedCuisines)}.`;
       }
       return "Highest-scoring recipe neighborhood from the default ranking. The first mode tends to be the one that splits the dataset best.";
     }
@@ -3588,16 +3588,6 @@
     return "neutral";
   }
 
-  function cuisineSignalLabel(score) {
-    if (score >= 6) return "Strong pull";
-    if (score >= 2) return "Pull";
-    if (score > 0.4) return "Soft pull";
-    if (score <= -6) return "Strong pass";
-    if (score <= -2) return "Pass";
-    if (score < -0.4) return "Soft pass";
-    return "No clear pull";
-  }
-
   function answerLabel(value) {
     if (value == null) return "No answer";
     if (value === "unknown") return "Unsure";
@@ -3612,10 +3602,10 @@
   }
 
   function contributionLabel(value) {
-    if (value >= 1) return "Pull";
-    if (value > 0.1) return "Soft pull";
-    if (value <= -1) return "Push";
-    if (value < -0.1) return "Soft push";
+    if (value >= 1) return "Strong yes";
+    if (value > 0.1) return "Leans yes";
+    if (value <= -1) return "Strong no";
+    if (value < -0.1) return "Leans no";
     return "No signal";
   }
 
